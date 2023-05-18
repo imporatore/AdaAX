@@ -3,6 +3,7 @@ from sklearn.cluster import KMeans
 from config import K, THETA
 
 
+# todo: require testing
 def pattern_extraction(input_sequences, hidden_states):
     def _clustering():
         N, L = hidden_states.shape[:2]
@@ -44,6 +45,7 @@ class SymbolNode:
         self.next = []
 
 
+# todo: require testing
 class PatternTree:
 
     def __init__(self, patterns, support):
@@ -74,4 +76,6 @@ class PatternTree:
 
 
 if __name__ == "__main__":
+    # todo: func test: pattern_extraction
+    # todo: class test: PatternTree
     pass

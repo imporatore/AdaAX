@@ -1,36 +1,40 @@
+import numpy as np
+
+
 class RNNLoader:
 
     def __int__(self, alphabet, rnn_data):
         """
 
         Param:
-            - alphabet:
-            - rnn_data:
-        :return:
+            - alphabet: list of shape (VOCAB_SIZE)
+            - rnn_data: (input_sequence, hidden_states, rnn_output)
+                - input_sequence, np.array of shape (N, PAD_LEN)
+                - hidden_states, np.array of shape (N, PAD_LEN, hidden_dim)
+                - rnn_output, np.array of shape (N,)
         """
+        self.alphabet = alphabet
         self.input_sequence, self.hidden_states, self.rnn_output = rnn_data
-        self._alphabet = alphabet
-        self._rnn_output =
 
-    @property
-    def start_state(self):
-        pass
+        # Check shape
+        assert self.input_sequence.shape[0] == self.hidden_states.shape[0]
+        assert self.input_sequence.shape[1] == self.hidden_states.shape[1]
+        assert self.input_sequence.shape[0] == self.rnn_output.shape[0]
 
-    @property
-    def accepting_state(self):
-        pass
+    def eval_fidelity(self, dfa):
+        return np.mean([dfa.classify_expression(expr) == ro for expr, ro in zip(self.input_sequence, self.rnn_output)])
 
 
-def load_rnn_results():
-    """
-
-    :return:
-    """
+# The hidden value in the RNN for given prefix
+# todo: Accelerate by using cashed hidden states
+def rnn_hidden_values(prefix):
     pass
 
 
-def rnn_hidden_output(prefix):
-    # if not prefix:
-    #     return
+# Euclidean distance of hidden state values
+def d(hidden1, hidden2):
+    return np.sqrt(np.sum((hidden1 - hidden2) ** 2))
 
+
+if __name__ == "__main__":
     pass

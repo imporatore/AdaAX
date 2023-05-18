@@ -1,5 +1,4 @@
 import functools
-from time import clock
 import string
 from collections import defaultdict
 import copy
@@ -8,8 +7,8 @@ import graphviz as gv
 from IPython.display import Image
 from IPython.display import display
 
-from states import State
-from helper import d
+from states import State, build_start_state, build_accept_state
+from utils import d
 from config import TAU, DELTA
 
 
@@ -20,26 +19,18 @@ separator = "_"
 
 
 class DFA:
-    def __init__(self, alphabet, h_0, F):
-        """
+    def __init__(self, rnn_loader):
+        self.alphabet = rnn_loader.alphabet
+        self.q0 = build_start_state()
+        self.F = build_accept_state(rnn_loader)
+        self.Q = [self.q0, self.F]
+        self.delta = defaultdict(defaultdict)  # todo: require testing
 
-        Params:
-            - alphabet:
-            - h_0:
-            - F:
-        """
-        self.alphabet = alphabet
-        self.Q = [h_0, F]
-        self.q0 = h_0
-        self.F = F
-        self.delta = defaultdict(defaultdict)  # todo: examine
-
-        # todo: prefix to state
+        self._eval_fidelity = rnn_loader.eval_fidelity
         self._prefix2state = defaultdict()
 
-        # todo: test mode
-        # self.__added_pattern = []
-
+    # todo: add pattern by PatternTree
+    # todo: require testing
     def _add_pattern(self, p):
         """ Add new? pattern to """
         q1 = self.q0
@@ -61,7 +52,9 @@ class DFA:
         self.delta[q1][s] = self.F
         return Q_new
 
-    def _build_dfa(self, patterns):
+    # todo: add pattern by PatternTree
+    # todo: require testing
+    def build_dfa(self, patterns):
         for p in patterns:
             A_t = self._add_pattern(p)
             while A_t:
@@ -76,9 +69,11 @@ class DFA:
                         self.Q, self.q0, self.F, self.delta = new_dfa.Q, new_dfa.q0, new_dfa.F, new_dfa.delta
                         break
 
+    # todo: require testing
     def _merge_states(self, state1, state2):
         # todo: forbid merging accept state
         # todo: add threshold for merging accept state
+        # todo: the hidden state values remains after merging
         new_dfa, new_state = copy.copy(self), copy.copy(state2)
         # new_state._added_prefix = new_state._added_prefix + state1._prefix
         # new_state._added_prefix.extend(state1._added_prefix)
@@ -108,7 +103,7 @@ class DFA:
         for s in transition2.keys():
             new_dfa.delta[new_state][s] = transition2[s]
 
-        # Update start and accepting states if merged.
+        # Update start and accept states if merged.
         if state2 == new_dfa.q0:
             new_dfa.q0 = new_state
         if state2 == new_dfa.F:
@@ -116,17 +111,20 @@ class DFA:
 
         return new_dfa
 
-    def classify_word(self, word):
-        # Word is string with only letters in alphabet
+    # todo: require testing
+    def classify_expression(self, expression):
+        # Expression is string with only letters in alphabet
         q = self.q0
-        for s in word:
+        for s in expression:
             q = self.delta[q][s]
-        return q in self.F
+        return q == self.F
 
+    # todo: require testing
     @property
     def fidelity(self):
-        return
+        return self._eval_fidelity(self)
 
+    # todo: require modify & testing. F used to be a set of accept states...
     def draw_nicely(self, force=False, maximum=60):
         # Stolen from Lstar
         # todo: if two edges are identical except for letter, merge them and note both the letters

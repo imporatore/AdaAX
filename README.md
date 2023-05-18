@@ -22,11 +22,11 @@ suffix same
 * represent if as empty list
 
 ### Twisting
-* forbid the transition from going to the accepting state too early
-  * forbid merging into the accepting state
+* forbid the transition from going to the accept state too early
+  * forbid merging into the accept state
   * add threshold for merging F
 * sampling
 
 
 ### Problems
-* Should the start & accepting states attend in the merging procedure?
+* Should the start & accept states attend in the merging procedure?

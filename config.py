@@ -2,6 +2,7 @@ import os
 
 # RNN parameter
 VOCAB_SIZE = 10000
+START_SYMBOL = '<START>'
 
 # Data path
 DATA_DIR = r'./data/'
