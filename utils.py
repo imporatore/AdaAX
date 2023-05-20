@@ -1,12 +1,12 @@
 import numpy as np
 
+from config import START_SYMBOL
+
 
 class RNNLoader:
 
     def __int__(self, alphabet, rnn_data):
         """ Result loader of trained RNN for extracting patterns and building DFA.
-
-        Also maintain function of calculating DFA fidelity.
 
         Args:
             - alphabet: list of shape (VOCAB_SIZE)
@@ -23,13 +23,12 @@ class RNNLoader:
         assert self.input_sequence.shape[1] == self.hidden_states.shape[1]
         assert self.input_sequence.shape[0] == self.rnn_output.shape[0]
 
-    def eval_fidelity(self, dfa):
-        """ Evaluate the fidelity of (extracted) DFA."""
-        return np.mean([dfa.classify_expression(expr) == ro for expr, ro in zip(self.input_sequence, self.rnn_output)])
+        # Check START_SYMBOL
+        if START_SYMBOL:
+            assert self.input_sequence[:, 0] == START_SYMBOL
 
     # The hidden value in the RNN for given prefix
     # todo: Accelerate by using cashed hidden states
-    # todo: should move into class RNNLoader
     def rnn_hidden_values(self, prefix):
         pass
 

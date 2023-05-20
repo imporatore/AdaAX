@@ -30,7 +30,7 @@ suffix same
 
 ### Problems
 * Should the start & accept states attend in the merging procedure?
-* the sequence patterns added to the DFA affects?
+* the order of patterns added to the DFA affects?
 
 ### Alphabet
 * one-hot

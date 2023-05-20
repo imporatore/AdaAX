@@ -3,13 +3,14 @@ import string
 from collections import defaultdict
 import copy
 
+import numpy as np
 import graphviz as gv
 from IPython.display import Image
 from IPython.display import display
 
 from states import State, build_start_state, build_accept_state
 from utils import d
-from config import TAU, DELTA, START_SYMBOL, HIDDEN_DIM
+from config import TAU, DELTA, START_SYMBOL, START_PREFIX
 
 
 digraph = functools.partial(gv.Digraph, format='png')
@@ -25,11 +26,9 @@ class DFA:
         self.q0 = build_start_state(rnn_loader)  # start state
         self.F = build_accept_state(rnn_loader)  # accept state
         self.Q = [self.q0, self.F]  # states
-        # self.delta = defaultdict(defaultdict)  # todo: require testing
         self.delta = defaultdict(dict)  # transition table
 
-        # fidelity evaluation function
-        # self._eval_fidelity = rnn_loader.eval_fidelity
+        # todo: check if this would take a lot of memory
         self._rnn_loader = rnn_loader
 
     # todo: add pattern by PatternTree
@@ -49,19 +48,13 @@ class DFA:
 
         # new state shouldn't be created for the last symbol in a pattern, since it is the accept state
         for i, s in enumerate(p[:-1]):
-            try:
-                q1 = self._prefix2state(p[:i+1])
-            except KeyError:
-                q2 = State(self._rnn_loader, p[:i+1])  # Initialize pure set from new prefix
+            if s in self.delta[q1].keys():
+                q1 = self.delta[q1][s]
+            else:
+                q1 = self._add_new_state(START_PREFIX + p[:i+1], q1)
+                Q_new.append(q1)
 
-                # Update DFA
-                self.Q.append(q2)  # Add to states
-                self.delta[q1][s] = q2  # Update transition
-
-                Q_new.append(q2)
-                q1 = q2
-
-        self.delta[q1][p[-1]] = self.F  # add transition of the last symbol to accept state
+        self._add_transit(q1, p[-1], self.F)  # add transition of the last symbol to accept state
         return Q_new
 
     # todo: add pattern by PatternTree
@@ -71,16 +64,23 @@ class DFA:
 
         Args:
             - patterns: list[list], list of patterns
+
+        Params:
+            - TAU: threshold for neighbour distance
+            - DELTA: threshold for merging fidelity loss
         """
         for p in patterns:
-            A_t = self._add_pattern(p)  # list of new states created by pattern p
+            # list of new states created by pattern
+            A_t = self._add_pattern(p[len(START_PREFIX):])  # if START_SYMBOL, first symbol in pattern is START_SYMBOL
             while A_t:
 
                 # try merge new states in A_t
                 q_t = A_t.pop()
-                N_t = {s: d(q_t._h, s._h) for s in self.Q}  # neighbours of q_t
+                N_t = {s: d(q_t._h, s._h) for s in self.Q if s != q_t}  # neighbours of q_t
+                # N_t = {s: d(q_t._h, s._h) for s in self.Q if s not in (q_t, self.F)}
+                # N_t = {s: d(q_t._h, s._h) for s in self.Q if s not in (q_t, self.F, self.q0)}
                 for s in sorted(N_t.keys(), key=lambda x: N_t[x]):
-                    if N_t[s] >= TAU:
+                    if N_t[s] >= TAU:  # threshold (Euclidean distance of hidden values) for merging states
                         break
 
                     new_dfa = self._merge_states(q_t, s)  # create the DFA after merging
@@ -94,6 +94,8 @@ class DFA:
     def _merge_states(self, state1, state2):
         """ Try merging state1 with state2.
 
+        Notice that if the child state not consistent, they will also be merged.
+
         Args:
             - state1:
             - state2:
@@ -105,7 +107,17 @@ class DFA:
         # todo: add threshold for merging accept state
         # todo: the hidden state values remains after merging
         new_dfa, new_state = copy.copy(self), copy.copy(state2)
-        new_state._prefix += state1.prefixes
+
+        # todo: check if start & accept state would be merged
+        # Update start and accept states if merged.
+        if state2 == self.q0:
+            new_dfa.q0 = new_state
+        elif state2 == self.F:
+            new_dfa.F = new_state
+
+        # update children set
+        for s in state1.parents.keys():
+            new_state.parents[s] += state1.parents[s]
 
         # update states
         new_dfa.Q.remove(state1)
@@ -113,47 +125,57 @@ class DFA:
         new_dfa.Q.append(new_state)
 
         # Update income transitions
-        for prefix in new_state._prefix:
-            prev_prefix, s = prefix[:-1], prefix[-1]
-            new_dfa.delta[new_dfa._prefix2state(prev_prefix)][s] = new_state
-
-        s1, s2 = new_dfa.delta[state1].keys(), new_dfa.delta[state2].keys()
-        # Merge outgoing states for common outgoing symbol
-        for s in set(s1).intersection(set(s2)):
-            new_dfa = new_dfa._merge_states(new_dfa.delta[state1][s], new_dfa.delta[state2][s])
+        for s in new_state.parents.keys():
+            for state in new_state.parents[s]:
+                new_dfa.delta[state][s] = new_state
 
         # Update outgoing transitions
         transition1, transition2 = new_dfa.delta.pop(state1), new_dfa.delta.pop(state2)
         for s in transition1.keys():
-            new_dfa.delta[new_state][s] = transition1[s]
-        for s in transition2.keys():
-            new_dfa.delta[new_state][s] = transition2[s]
+            child1 = transition1.pop(s)
+            try:
+                child2 = transition2.pop(s)
+                if child1 != child2:
+                    # Merge outgoing states for common outgoing symbol if child state doesn't correspond
+                    new_dfa = new_dfa._merge_states(child1, child2)
+                else:
+                    # update consistent child state
+                    new_dfa._add_transit(new_state, s, child1)
+                    child1.parents[s].remove(state1)
+                    child2.parents[s].remove(state2)
+            except KeyError:  # outgoing symbol only in state1
+                new_dfa._add_transit(new_state, s, child1)
+                child1.parents[s].remove(state1)
 
-        # Update start and accept states if merged.
-        if state2 == new_dfa.q0:
-            new_dfa.q0 = new_state
-        if state2 == new_dfa.F:
-            new_dfa.F = new_state
+        for s, child in transition2.items():  # outgoing symbol only in state2
+            new_dfa._add_transit(new_state, s, child)
+            child.parents[s].remove(state2)
 
         return new_dfa
 
-    # mapping from prefix to the state holding it
-    # maintained for fast searching state's previous state when updating transition after state merging
-    # todo: could be replaced for another 'children' or backtrack dict
-    # todo: algorithm?
-    # todo: check consistency
-    # todo: needs to modify cashe after merging if was accessed before
-    @functools.lru_cache(maxsize=None)
-    def _prefix2state(self, prefix):
-        if prefix == [START_SYMBOL]:
+    def prefix2state(self, prefix):
+        """ Return the state in DFA for prefix."""
+        if prefix == START_PREFIX:
             return self.q0
-        return self.delta[self._prefix2state(prefix[:-1])][prefix[-1]]
+        return self.delta[self.prefix2state(prefix[:-1])][prefix[-1]]
+
+    def _add_new_state(self, prefix, prev_state):
+        """ Add and return the new state from a new prefix."""
+        state = State(self._rnn_loader, prefix, prev_state)  # Initialize pure set from new prefix
+
+        # Update DFA
+        self.Q.append(state)  # Add to states
+        self._add_transit(prev_state, prefix[-1], state)  # Update transition
+        return state
 
     # todo: require testing
+    # todo: as we only extract patterns from positive samples, and DFA entirely built on these patterns
+    # todo: how to deal with missing transitions?
+    # todo: needs modification
     def classify_expression(self, expression):
         # Expression is string with only letters in alphabet
         q = self.q0
-        for s in expression:
+        for s in expression[len(START_PREFIX):]:
             q = self.delta[q][s]
         return q == self.F
 
@@ -161,18 +183,26 @@ class DFA:
     # todo: only called when merging, may use cashed result to accelerate, as the difference in the merged DFA is small
     @property
     def fidelity(self):
-        # return self._eval_fidelity(self)
-        return self._rnn_loader.eval_fidelity(self)
+        """ Evaluate the fidelity of (extracted) DFA from rnn_loader."""
+        return np.mean([self.classify_expression(expr) == ro for expr, ro in zip(
+            self._rnn_loader.input_sequence, self._rnn_loader.rnn_output)])
+
+    def _add_transit(self, state1, symbol, state2):
+        """ Add a transition from state1 to state2 by symbol."""
+        self.delta[state1][symbol] = state2  # update transition table
+        state2.parents[symbol] += [state1]  # update parent set of state2
 
     # todo: require modify & testing. F used to be a set of accept states...
     def draw_nicely(self, force=False, maximum=60):
         # Stolen from Lstar
         # todo: if two edges are identical except for letter, merge them and note both the letters
         if (not force) and len(self.Q) > maximum:
-            return
+            raise Warning('State number exceeds limit (Maximum %d).' % maximum)
 
         # suspicion: graphviz may be upset by certain sequences, avoid them in nodes
         label_to_number_dict = {False: 0}  # false is never a label but gets us started
+
+        def state2int(state):
 
         def label_to_numberlabel(label):
             max_number = max(label_to_number_dict[l] for l in label_to_number_dict)
@@ -197,8 +227,10 @@ class DFA:
             return graph
 
         g = digraph()
-        g = add_nodes(g, [(label_to_numberlabel(self.q0), {'color': 'green' if self.q0 in self.F else 'black',
-                                                           'shape': 'hexagon', 'label': 'start'})])
+        g = add_nodes(g, [(label_to_numberlabel(self.q0),
+                           {'color': 'green' if self.q0 in self.F else 'black',
+                            'shape': 'hexagon', 'label': 'start'})])
+
         states = list(set(self.Q) - {self.q0})
         g = add_nodes(g, [(label_to_numberlabel(state), {'color': 'green' if state in self.F else 'black',
                                                          'label': str(i)})

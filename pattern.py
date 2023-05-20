@@ -3,7 +3,7 @@ import warnings
 from sklearn.cluster import KMeans
 import numpy as np
 
-from config import K, THETA, START_SYMBOL
+from config import K, THETA, START_SYMBOL, START_PREFIX
 # todo: check if extracted pattern is unique
 
 
@@ -29,10 +29,10 @@ def pattern_extraction(rnn_loader):
         N, L = rnn_loader.hidden_states.shape[:2]
         # first layer (start state) & last layer (accept state) doesn't participate in the clustering stage
         kmeans = KMeans(n_clusters=K, init='k-means++', n_init='auto').fit(
-            rnn_loader.hidden_states[:, 1: -1, :].reshape((N * (L-2), -1)))
+            rnn_loader.hidden_states[:, len(START_PREFIX): -1, :].reshape((N * (L - 1 - len(START_PREFIX)), -1)))
         # add a cluster -1 for start state
         start_cluster = np.array([-1] * N, dtype=np.int32).reshape((N, 1))
-        return np.hstack(start_cluster, kmeans.labels_.reshape((N, (L-2))))
+        return np.hstack(start_cluster, kmeans.labels_.reshape((N, (L - 1 - len(START_PREFIX)))))
 
     clusters = _clustering()  # Notice shape, (N, L-1)
     patterns, support = [], []
@@ -53,7 +53,7 @@ def pattern_extraction(rnn_loader):
         # Reaches start state and add pattern
         # When start symbol was added,
         if lvl == 0:
-            patterns.append([START_SYMBOL] + p)
+            patterns.append(START_PREFIX + p)
             support.append(len(ind) / rnn_loader.input_sequences.shape[0])
             return
 
@@ -105,12 +105,13 @@ class PatternTree:
     """ Prefix tree for extracted pattern."""
 
     def __init__(self, patterns, support):
-        self.root = SymbolNode('<START>')
+        self.root = SymbolNode(START_SYMBOL)
         self._build_tree(patterns, support)
 
     def _build_tree(self, patterns, support):
         for p, s in zip(patterns, support):
-            self._update(p, s)
+            self._update(p[len(START_PREFIX):], s)  # if START_SYMBOL, the first symbol of pattern would be START_SYMBOL
+
 
     # Seems there can't be two same pattern extracted.
     # todo: modify the code.
@@ -134,7 +135,7 @@ class PatternTree:
     # todo: PatternTree flow
     # so that we don't have to start from the start state when adding new pattern
     def __iter__(self):
-        pass
+        yield
 
 
 if __name__ == "__main__":
