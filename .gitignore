@@ -1,14 +1,12 @@
-/backup.py
+/.idea/
+/__pychache__/
+
 /explore_GPT4.ipynb
-/test.ipynb
-/test.py
+
+/backup/
 /easy_implementation/
 /lstar/
-/data/*.npy
-/data/*.csv
-/data/*.json
 
-/.idea/
 /RNN/data_loader.py
 /RNN/main.py
 /RNN/model.py
@@ -17,4 +15,6 @@
 /RNN/yelp_classification_ChatGPT.ipynb
 /RNN/yelp_classification_GPT4.ipynb
 
-/__pychache__/
+/data/*.npy
+/data/*.csv
+/data/*.json
