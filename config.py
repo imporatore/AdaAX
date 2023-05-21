@@ -21,3 +21,6 @@ K = 10  # Initial cluster numbers, determined by elbow method
 THETA = 0.005  # Threshold for pruning
 TAU = 1  # Threshold for neighbour distance
 DELTA = 0.001  # Threshold for merging fidelity loss
+
+# Plot
+SEP = ", "

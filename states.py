@@ -23,6 +23,12 @@ class PureSet:
         self._prefix = prefix
         self._h = rnn_loader.rnn_hidden_values(prefix)  # hidden value
 
+    def __str__(self):
+        pass
+
+    def __repr__(self):
+        pass
+
 
 class State(PureSet):
     """ State(in DFA) is a set of 'PureSet'(prefixes).
