@@ -12,6 +12,7 @@ DATA_DIR = r"D:\PycharmProjects\AdaAX\data"
 RNN_HIDDEN_DIR = os.path.join(DATA_DIR, 'hidden_params_rnn.npy')
 LSTM_HIDDEN_DIR = os.path.join(DATA_DIR, 'hidden_params_lstm.npy')
 GRU_HIDDEN_DIR = os.path.join(DATA_DIR, 'hidden_params_gru.npy')
+RANDOM_STATE = 13579
 
 # todo: add command line arguments
 # todo: auto select cluster num

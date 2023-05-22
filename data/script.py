@@ -1,10 +1,10 @@
 import random
 
-from config import DATA_DIR
+from config import DATA_DIR, RANDOM_STATE
 from data.Grammars import *
 from data.utils import gen_dataset, save2pickle, save2csv
 
-random.seed(13579)
+random.seed(RANDOM_STATE)
 
 
 def gen_synthetic_dataset(path=DATA_DIR, ftype='pickle'):
@@ -42,13 +42,27 @@ if __name__ == "__main__":
     gen_synthetic_dataset()
     gen_tomita_dataset()
 
-    # yelp dataset from kaggle
-    df = pd.read_json(os.path.join(DATA_DIR, "yelp_academic_dataset_review.json"), lines=True)
-    df = df[['stars', 'text']]  # keep only the 'stars' and 'text' columns
+    # yelp review polarity dataset
+    yelp_train_df = pd.read_csv(os.path.join(DATA_DIR, "train.csv"), header=None)
+    yelp_test_df = pd.read_csv(os.path.join(DATA_DIR, "test.csv"), header=None)
+
+    yelp_train_df.columns, yelp_test_df.columns = ['stars', 'expr'], ['stars', 'expr']  # name columns
+    yelp_review_df = pd.concat([yelp_train_df, yelp_test_df])  # merge two dataset
 
     # convert into binary label, 4-5 stars for 1 and 1-3 stars for 0
-    df['label'] = df['stars'].apply(lambda rating: 1 if rating > 3 else 0)
-    df = df[['text', 'label']]  # Keep only the 'text' and 'sentiment' columns
+    yelp_review_df['label'] = yelp_review_df['stars'].apply(lambda rating: 1 if rating > 3 else 0)
 
-    save2csv(DATA_DIR, df, 'yelp_review')
+    yelp_review_df['len'] = yelp_review_df['expr'].apply(lambda string: len(' '.split(string)))
+    # # select only reviews that are less than 25 words and the 'expr' and 'label' columns
+    yelp_review_df = yelp_review_df.loc[yelp_review_df['len'] < 25, ['expr', 'label']]
 
+    # generate 20000 class-balanced sample
+    yelp_pos_review = yelp_review_df.loc[yelp_review_df['label'] == 1].reset_index(drop=True)
+    yelp_neg_review = yelp_review_df.loc[yelp_review_df['label'] == 0].reset_index(drop=True)
+    yelp_pos_review = yelp_pos_review.sample(10000, random_state=RANDOM_STATE)
+    yelp_neg_review = yelp_neg_review.sample(10000, random_state=RANDOM_STATE)
+
+    yelp_review_balanced = pd.concat([yelp_pos_review, yelp_neg_review])
+    yelp_review_balanced = yelp_review_balanced.sample(20000)
+
+    save2csv(DATA_DIR, yelp_review_balanced, 'yelp_review_balanced')
