@@ -8,7 +8,7 @@ START_SYMBOL = '<START>'  # todo: modify the code for a None START_SYMBOL when w
 START_PREFIX = [START_SYMBOL] if START_SYMBOL else []
 
 # Data path
-DATA_DIR = r'./data/'
+DATA_DIR = r"D:\PycharmProjects\AdaAX\data"
 RNN_HIDDEN_DIR = os.path.join(DATA_DIR, 'hidden_params_rnn.npy')
 LSTM_HIDDEN_DIR = os.path.join(DATA_DIR, 'hidden_params_lstm.npy')
 GRU_HIDDEN_DIR = os.path.join(DATA_DIR, 'hidden_params_gru.npy')

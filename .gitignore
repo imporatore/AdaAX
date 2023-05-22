@@ -11,11 +11,14 @@ __pycache__/*.pyc
 /RNN/data_loader.py
 /RNN/main.py
 /RNN/model.py
+/RNN/script.py
 /RNN/imdb.ipynb
 /RNN/imdb2023.5.16.ipynb
 /RNN/yelp_classification_ChatGPT.ipynb
 /RNN/yelp_classification_GPT4.ipynb
 
+/data/__pycache__/
 /data/*.npy
 /data/*.csv
 /data/*.json
+/data/*.pickle
