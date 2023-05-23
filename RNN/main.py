@@ -37,7 +37,7 @@ def train_and_validate(model, model_path, train_data, valid_data, learning_rate,
         for i, (seq, label) in enumerate(train_data):
 
             seq = seq.to(device)
-            label = label.to(device)
+            label = label.to(device).view(-1, 1).float()
 
             optimizer.zero_grad()
             output, _ = model(seq)
@@ -74,7 +74,7 @@ def train(model, model_path, train_data, learning_rate, total_epoch):
         for i, (seq, label) in enumerate(train_data):
 
             seq = seq.to(device)
-            label = label.to(device)
+            label = label.to(device).view(-1, 1).float()
 
             optimizer.zero_grad()
             output, _ = model(seq)
@@ -88,7 +88,7 @@ def train(model, model_path, train_data, learning_rate, total_epoch):
             total += output.size(0)
 
         # print epoch accuracy
-        print("training accuracy: {}/{} ".format(correct, total), correct / total)
+        print("\ntraining accuracy: {}/{} ".format(correct, total), correct / total)
 
     torch.save(model.state_dict(), model_path)
 
@@ -102,7 +102,7 @@ def validate(model, valid_data):
 
             # convert to cuda
             seq = seq.to(device)
-            label = label.to(device)
+            label = label.to(device).view(-1, 1)
 
             # Forward
             output, _ = model(seq)
@@ -140,7 +140,7 @@ def predict_and_save(model, dataloader, save_path=RNN_RESULT_DIR):
         output, hidden = model(seq)
         seq = seq.cpu().numpy()
         hidden = hidden.cpu().numpy()
-        label = label.cpu().numpy()
+        label = label.cpu().numpy().view(-1, 1)
         output = torch.sigmoid(output).round().cpu().numpy()
         prediction.extend(output.tolist())
 
@@ -194,7 +194,7 @@ def main(config):
                            config.dropout_rate,
                            glove).to(device)
 
-    print("model loaded...")
+    print("\nmodel loaded...")
 
     if valid_data:
         train_and_validate(model=model,

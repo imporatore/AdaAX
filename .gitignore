@@ -8,6 +8,7 @@ __pycache__/*.pyc
 /easy_implementation/
 /lstar/
 
+/RNN/__pycache__/
 /RNN/imdb.ipynb
 /RNN/imdb2023.5.16.ipynb
 /RNN/yelp_classification_ChatGPT.ipynb
@@ -20,3 +21,10 @@ __pycache__/*.pyc
 /data/*.json
 /data/*.pickle
 /data/*.pkl
+
+*.npy
+*.csv
+*.json
+*.pickle
+*.pkl
+*.pyc
