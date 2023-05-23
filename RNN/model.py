@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
 class VanillaRNN(nn.Module):
@@ -15,14 +14,14 @@ class VanillaRNN(nn.Module):
         self.dropout = nn.Dropout(dropout_rate)
         self.linear = nn.Linear(hidden_size, output_size)
 
-    def forward(self, input, lengths):
+    def forward(self, input):
         embeddings = self.embedding(input)
         embeddings = self.dropout(embeddings)
-        packed = pack_padded_sequence(embeddings, lengths, batch_first=True)
-        rnn_out, hidden_state = self.rnn(packed)
+        rnn_out, hidden_state = self.rnn(embeddings, batch_first=True)
+        # assert torch.equal(rnn_out[-1, :, :], hidden.squeeze(0))
         # out = self.linear(rnn_out[:])
         out = self.linear(hidden_state.squeeze(0))
-        return out
+        return out, hidden_state
 
 
 class VanillaLSTMModel(nn.Module):
@@ -40,13 +39,12 @@ class VanillaLSTMModel(nn.Module):
     def forward(self, input, lengths):
         embeddings = self.embedding(input)
         embeddings = self.dropout(embeddings)
-        packed = pack_padded_sequence(embeddings, lengths, batch_first=True)
         # lstm_out: tensor containing all output hidden states, for each timestep. shape: (length, batch, hidden_size)
         # hidden_state: tensor containing the hidden state for last timestep. shape: (1, batch, hidden_size)
         # cell state: tensor containing the cell state for last timestep. shape: (1, batch, hidden_size)
-        lstm_out, (hidden_state, cell_state) = self.lstm(packed)
+        lstm_out, (hidden_state, cell_state) = self.lstm(embeddings, batch_first=True)
         out = self.linear(hidden_state.squeeze(0))
-        return out
+        return out, hidden_state
 
 
 class VanillaGRUModel(nn.Module):
@@ -63,10 +61,9 @@ class VanillaGRUModel(nn.Module):
     def forward(self, input, lengths):
         embeddings = self.embedding(input)
         embeddings = self.dropout(embeddings)
-        packed = pack_padded_sequence(embeddings, lengths, batch_first=True)
-        gru_out, hidden_state = self.gru(packed)
+        gru_out, hidden_state = self.gru(embeddings, batch_first=True)
         out = self.linear(hidden_state.squeeze(0))
-        return out
+        return out, hidden_state
 
 
 class GloveModel(nn.Module):
@@ -87,10 +84,8 @@ class GloveModel(nn.Module):
     def forward(self, input, lengths):
         embeddings = self.embedding(input)
         embeddings = self.dropout(embeddings)
-        packed = pack_padded_sequence(embeddings, lengths, batch_first=True)
 
-        lstm_out, (hidden_state, cell_state) = self.lstm(packed, num_layers=2)
-        lstm_out, lengths = pad_packed_sequence(lstm_out)
+        lstm_out, (hidden_state, cell_state) = self.lstm(embeddings, num_layers=2, batch_first=True)
 
         # pool the lengths
         avg_pool = F.adaptive_avg_pool1d(lstm_out.permute((1, 2, 0)), 1).squeeze()
@@ -99,7 +94,7 @@ class GloveModel(nn.Module):
         # concat forward and pooled states
         concat = torch.cat((hidden_state[-1, :, :], max_pool, avg_pool), dim=1)
         out = self.linear(concat)
-        return out
+        return out, hidden_state
 
 
 if __name__ == '__main__':

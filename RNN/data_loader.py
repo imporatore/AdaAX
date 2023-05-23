@@ -36,7 +36,7 @@ class SyntheticDataset(Dataset):
         # synthetic data, there is no ambiguity
         seqs = pad_seq2idx(tokens, pad_len, self.vocab.word2idx)
 
-        self.data = list(zip(y, seqs))
+        self.data = list(zip(seqs, y))
 
     def __len__(self):
         return len(self.data)
@@ -60,8 +60,7 @@ class PolarityDataset(Dataset):
 
         df["text"] = df["text"].progress_apply(preprocess)  # preprocess
         df['words'] = start_prefix + df["text"].progress_apply(tokenize)  # tokenize
-        df['lengths'] = df['words'].apply(lambda x: min(len(x), pad_len))  # take lengths of words
-        df = df.loc[df['lengths'] >= 1].reset_index(drop=True)  # filter out rows with lengths of 0
+        df = df.loc[df['words'].apply(len) > 1].reset_index(drop=True)  # filter out rows with lengths of 0
 
         self.vocab = build_vocab(df['words'], min_count, vocab)  # build vocab
         seqs = pad_seq2idx(df['words'], pad_len, self.vocab.word2idx)  # pad to fix length & substitute with index
@@ -76,7 +75,7 @@ class PolarityDataset(Dataset):
         weight = 1. / class_sample_count
         self.samples_weight = torch.from_numpy(weight[df['label']])
 
-        self.data = list(zip(df['label'], seqs, df["lengths"]))
+        self.data = list(zip(seqs, df['label']))
 
     def __len__(self):
         return len(self.data)
@@ -111,7 +110,7 @@ def get_loader(data_dir, fname, batch_size):
         train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
         test_dataloader = DataLoader(dataset=test_dataset,  batch_size=batch_size, shuffle=False, num_workers=4)
 
-        return train_dataloader, test_dataloader, train_dataset.vocab
+        return train_dataloader, None, test_dataloader, train_dataset.vocab
 
     else:
         data = load_csv(data_dir, fname)

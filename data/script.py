@@ -55,9 +55,9 @@ if __name__ == "__main__":
     # convert into binary label, 4-5 stars for 1 and 1-3 stars for 0
     yelp_review_df['label'] = yelp_review_df['stars'].apply(lambda rating: 1 if rating > 3 else 0)
 
-    yelp_review_df['len'] = yelp_review_df['expr'].apply(lambda string: len(' '.split(string)))
+    yelp_review_df['len'] = yelp_review_df['text'].apply(lambda string: len(' '.split(string)))
     # # select only reviews that are less than 25 words and the 'expr' and 'label' columns
-    yelp_review_df = yelp_review_df.loc[yelp_review_df['len'] < 25, ['expr', 'label']]
+    yelp_review_df = yelp_review_df.loc[yelp_review_df['len'] < 25, ['text', 'label']]
 
     # generate 20000 class-balanced sample
     yelp_pos_review = yelp_review_df.loc[yelp_review_df['label'] == 1].reset_index(drop=True)
