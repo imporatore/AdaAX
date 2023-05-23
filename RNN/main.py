@@ -4,12 +4,11 @@ import os
 import torch
 import torch.nn as nn
 import pandas as pd
-import numpy as np
 
 from tqdm import tqdm, trange
 
 from config import RANDOM_STATE, RNN_MODEL_DIR, RNN_RESULT_DIR
-from data.utils import save2pickle, save2csv, save2npy
+from data.utils import save2csv, save2npy
 from RNN.data_loader import get_loader
 from RNN.model import VanillaRNN, VanillaLSTMModel, VanillaGRUModel, GloveModel
 
@@ -232,7 +231,7 @@ if __name__ == "__main__":
 
     # model parameters
     parser.add_argument("--hidden_size", type=int, default=256)
-    parser.add_argument("--embedding_size", type=int, default=100, choices=[100, 300])
+    parser.add_argument("--embedding_size", type=int, default=100)
     parser.add_argument("--dropout_rate", type=float, default=0.2)
 
     # training parameters

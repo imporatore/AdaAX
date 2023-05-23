@@ -1,7 +1,7 @@
 import random
 
 from config import RANDOM_STATE, RAW_DATA_DIR, SYNTHETIC_DATA_DIR, TOMITA_DATA_DIR, REAL_DATA_DIR
-from data.Grammars import *
+from data.Grammars import rule1, rule2, tomita4, tomita7
 from data.utils import gen_dataset, save2pickle, save2csv
 
 random.seed(RANDOM_STATE)

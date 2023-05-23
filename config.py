@@ -4,7 +4,7 @@ import os
 RANDOM_STATE = 13579
 
 # ------------------ Path ------------------------
-DATA_DIR = r"D:\PycharmProjects\AdaAX\data"
+DATA_DIR = r"C:\PycharmProjects\AdaAX\data"
 
 RAW_DATA_DIR = os.path.join(DATA_DIR, 'raw_data')
 SYNTHETIC_DATA_DIR = os.path.join(DATA_DIR, 'synthetic_data')

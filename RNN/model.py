@@ -10,14 +10,14 @@ class VanillaRNN(nn.Module):
         input_size, output_size = len(vocab), 1
 
         self.embedding = nn.Embedding(input_size, embedding_size)
-        self.rnn = nn.RNN(embedding_size, hidden_size)
+        self.rnn = nn.RNN(embedding_size, hidden_size, batch_first=True)
         self.dropout = nn.Dropout(dropout_rate)
         self.linear = nn.Linear(hidden_size, output_size)
 
     def forward(self, input):
         embeddings = self.embedding(input)
         embeddings = self.dropout(embeddings)
-        rnn_out, hidden_state = self.rnn(embeddings, batch_first=True)
+        rnn_out, hidden_state = self.rnn(embeddings)
         # assert torch.equal(rnn_out[-1, :, :], hidden.squeeze(0))
         # out = self.linear(rnn_out[:])
         out = self.linear(hidden_state.squeeze(0))
@@ -32,7 +32,7 @@ class VanillaLSTMModel(nn.Module):
         input_size, output_size = len(vocab), 1
 
         self.embedding = nn.Embedding(input_size, embedding_size)
-        self.lstm = nn.LSTM(embedding_size, hidden_size)
+        self.lstm = nn.LSTM(embedding_size, hidden_size, batch_first=True)
         self.dropout = nn.Dropout(dropout_rate)
         self.linear = nn.Linear(hidden_size, output_size)
 
@@ -54,7 +54,7 @@ class VanillaGRUModel(nn.Module):
         input_size, output_size = len(vocab), 1
 
         self.embedding = nn.Embedding(input_size, embedding_size)
-        self.gru = nn.GRU(embedding_size, hidden_size)
+        self.gru = nn.GRU(embedding_size, hidden_size, batch_first=True)
         self.dropout = nn.Dropout(dropout_rate)
         self.linear = nn.Linear(hidden_size, output_size)
 
@@ -77,7 +77,7 @@ class GloveModel(nn.Module):
         output_size = 1
 
         self.embedding = nn.Embedding.from_pretrained(glove)
-        self.lstm = nn.LSTM(embedding_size, hidden_size)
+        self.lstm = nn.LSTM(embedding_size, hidden_size, batch_first=True)
         self.dropout = nn.Dropout(dropout_rate)
         self.linear = nn.Linear(3 * hidden_size, output_size)
 
