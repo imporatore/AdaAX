@@ -1,16 +1,13 @@
-from __future__ import absolute_import
-
 import random
 
-from ..config import RANDOM_STATE
-from data.config import DATA_DIR
+from config import RANDOM_STATE, RAW_DATA_DIR, SYNTHETIC_DATA_DIR, TOMITA_DATA_DIR, REAL_DATA_DIR
 from data.Grammars import *
 from data.utils import gen_dataset, save2pickle, save2csv
 
 random.seed(RANDOM_STATE)
 
 
-def gen_synthetic_dataset(path=DATA_DIR, ftype='pickle'):
+def gen_synthetic_dataset(path=SYNTHETIC_DATA_DIR, ftype='pickle'):
     synthetic_data_1 = gen_dataset("01", rule1, 15, 20000, class_balance=False)
     synthetic_data_2 = gen_dataset("01", rule2, 15, 20000, class_balance=False)
     if ftype == 'pickle':
@@ -24,7 +21,7 @@ def gen_synthetic_dataset(path=DATA_DIR, ftype='pickle'):
     raise ValueError("Argument ftype should be either 'pickle' or 'pandas'.")
 
 
-def gen_tomita_dataset(path=DATA_DIR, ftype='pickle'):
+def gen_tomita_dataset(path=TOMITA_DATA_DIR, ftype='pickle'):
     tomita_data_1 = gen_dataset("01", tomita4, list(range(15)) + [15, 20, 25, 30], 5000)
     tomita_data_2 = gen_dataset("01", tomita7, list(range(15)) + [15, 20, 25, 30], 5000)
     if ftype == 'pickle':
@@ -46,8 +43,8 @@ if __name__ == "__main__":
     gen_tomita_dataset()
 
     # yelp review polarity dataset
-    yelp_train_df = pd.read_csv(os.path.join(DATA_DIR, "train.csv"), header=None)
-    yelp_test_df = pd.read_csv(os.path.join(DATA_DIR, "test.csv"), header=None)
+    yelp_train_df = pd.read_csv(os.path.join(RAW_DATA_DIR, "train.csv"), header=None)
+    yelp_test_df = pd.read_csv(os.path.join(RAW_DATA_DIR, "test.csv"), header=None)
 
     yelp_train_df.columns, yelp_test_df.columns = ['stars', 'text'], ['stars', 'text']  # name columns
     yelp_review_df = pd.concat([yelp_train_df, yelp_test_df])  # merge two dataset
@@ -68,4 +65,4 @@ if __name__ == "__main__":
     yelp_review_balanced = pd.concat([yelp_pos_review, yelp_neg_review])
     yelp_review_balanced = yelp_review_balanced.sample(20000).reset_index(drop=True)
 
-    save2csv(DATA_DIR, yelp_review_balanced, 'yelp_review_balanced')
+    save2csv(REAL_DATA_DIR, yelp_review_balanced, 'yelp_review_balanced')

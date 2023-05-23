@@ -8,7 +8,6 @@ __pycache__/*.pyc
 /easy_implementation/
 /lstar/
 
-/RNN/script.py
 /RNN/imdb.ipynb
 /RNN/imdb2023.5.16.ipynb
 /RNN/yelp_classification_ChatGPT.ipynb

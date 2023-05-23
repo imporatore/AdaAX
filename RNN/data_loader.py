@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import warnings
 
 import torch
@@ -8,9 +6,8 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 
-from ..config import RANDOM_STATE, START_PREFIX
+from config import RANDOM_STATE, START_PREFIX, VOCAB_THRESHOLD, SYNTHETIC_DATA_DIR, TOMITA_DATA_DIR, REAL_DATA_DIR
 from data.utils import load_pickle, load_csv
-from RNN.config import VOCAB_THRESHOLD
 from RNN.Helper_Functions import preprocess, tokenize, build_vocab, pad_seq2idx, Vocab
 
 
@@ -84,26 +81,26 @@ class PolarityDataset(Dataset):
         return self.data[i]
 
 
-def get_loader(data_dir, fname, batch_size):
+def get_loader(fname, batch_size):
 
     if fname in ["synthetic_data_1", "synthetic_data_2", "tomita_data_1", "tomita_data_2"]:
         ftype = 'synthetic'
     elif fname in ["yelp_review_balanced"]:
         ftype = 'real'
     else:
-        raise ValueError('File %s not found in %s.' % (fname, data_dir))
+        raise ValueError('File %s not found.' % fname)
 
     if ftype == 'synthetic':
-        X, y = load_pickle(data_dir, fname)
 
         if fname in ["synthetic_data_1", "synthetic_data_2"]:
-            pad_len = 15
+            pad_len, data_dir = 15, SYNTHETIC_DATA_DIR
         else:
-            pad_len = 30
+            pad_len, data_dir = 30, TOMITA_DATA_DIR
+
+        X, y = load_pickle(data_dir, fname)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_STATE)
 
         alphabet = '01'
-
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_STATE)
         train_dataset = SyntheticDataset((X_train, y_train), alphabet, start_prefix=START_PREFIX, pad_len=pad_len)
         test_dataset = SyntheticDataset((X_test, y_test), alphabet, START_PREFIX, pad_len, train_dataset.vocab)
 
@@ -113,7 +110,7 @@ def get_loader(data_dir, fname, batch_size):
         return train_dataloader, None, test_dataloader, train_dataset.vocab
 
     else:
-        data = load_csv(data_dir, fname)
+        data = load_csv(REAL_DATA_DIR, fname)
         train_df, test_df = data.iloc[:int(data.shape[0] * .6)], data.iloc[int(data.shape[0] * .8):]
         valid_df = data.iloc[int(data.shape[0] * .6): int(data.shape[0] * .8)]
 

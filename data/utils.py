@@ -4,6 +4,7 @@ import os
 
 import pickle
 import pandas as pd
+import numpy as np
 
 
 def gen_seq_fixed_len(alphabet, N_samples, length):
@@ -100,6 +101,10 @@ def gen_dataset(alphabet, rule, lens, num_per_len, class_balance=True):
 
 
 def save2pickle(fpath, data, fname):
+
+    if not os.path.exists(fpath):
+        os.makedirs(fpath)
+
     with open(os.path.join(fpath, fname + ".pickle"), "wb") as handle:
         pickle.dump(data, handle)
         # pickle.dump(save_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -115,6 +120,10 @@ def load_pickle(fpath, fname):
 
 
 def save2csv(fpath, data, fname):
+
+    if not os.path.exists(fpath):
+        os.makedirs(fpath)
+
     if isinstance(data, tuple):
         data = pd.DataFrame(data, columns=['expr', 'label'])
     data.to_csv(os.path.join(fpath, fname + ".csv"), index=False)
@@ -124,3 +133,10 @@ def load_csv(fpath, fname):
     data = pd.read_csv(os.path.join(fpath, fname + ".csv"))
     return data
 
+
+def save2npy(fpath, data, fname):
+
+    if not os.path.exists(fpath):
+        os.makedirs(fpath)
+
+    np.save(os.path.join(fpath, fname + '.npy'), data)

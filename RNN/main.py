@@ -8,9 +8,8 @@ import numpy as np
 
 from tqdm import tqdm, trange
 
-from config import RANDOM_STATE
-from data.config import DATA_DIR
-from data.utils import save2pickle, save2csv
+from config import RANDOM_STATE, RNN_MODEL_DIR, RNN_RESULT_DIR
+from data.utils import save2pickle, save2csv, save2npy
 from RNN.data_loader import get_loader
 from RNN.model import VanillaRNN, VanillaLSTMModel, VanillaGRUModel, GloveModel
 
@@ -131,7 +130,7 @@ def predict(model, dataloader):
     return prediction
 
 
-def predict_and_save(model, dataloader):
+def predict_and_save(model, dataloader, save_path=RNN_RESULT_DIR):
     model.eval()
     prediction = []
     for i, (seq, label) in enumerate(tqdm(dataloader)):
@@ -154,8 +153,7 @@ def predict_and_save(model, dataloader):
             'predictions': output
         }
 
-        # Save as .npy file
-        np.save(f'data_{i}.npy', data)
+        save2npy(save_path, data, f"data_{i}.npy")
 
     return prediction
 
@@ -167,7 +165,6 @@ def main(config):
 
     # load data
     train_data, valid_data, test_data, vocab = get_loader(
-        data_dir=config.data_dir,
         fname=config.fname,
         batch_size=config.batch_size
     )
@@ -221,18 +218,16 @@ def main(config):
     sub_df['text'] = test_data.dataset.df['text']
     sub_df['label'] = test_data.dataset.df['label']
     sub_df["rnn_predict"] = output
-    save2csv(DATA_DIR, sub_df, "test_predict.csv")
+    save2csv(RNN_RESULT_DIR, sub_df, "test_predict.csv")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # setup parameters
-    parser.add_argument("--data_dir", type=str, default=DATA_DIR)
     parser.add_argument("--fname", type=str)
     parser.add_argument("--model", type=str, default="rnn", choices=["rnn", "lstm", "gru", "glove-lstm"])
-    parser.add_argument('--data', type=str, default='.root')
-    parser.add_argument("--model_dir", type=str, default='./models')
+    parser.add_argument("--model_dir", type=str, default=RNN_MODEL_DIR)
     # parser.add_argument("--vocab_path", type=str, default='vocab.pkl')
 
     # model parameters
