@@ -9,7 +9,6 @@ __pycache__/*.pyc
 /lstar/
 
 /RNN/main.py
-/RNN/model.py
 /RNN/script.py
 /RNN/imdb.ipynb
 /RNN/imdb2023.5.16.ipynb
