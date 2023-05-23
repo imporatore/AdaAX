@@ -1,6 +1,6 @@
+import copy
 import functools
 from collections import defaultdict
-import copy
 
 import numpy as np
 import graphviz as gv
@@ -17,6 +17,10 @@ graph = functools.partial(gv.Graph, format='png')
 
 # todo: add state split to ensure gradually learning more & more difficult patterns from flow or samplers
 class DFA:
+    """
+    Attributes:
+
+    """
     def __init__(self, rnn_loader):
         self.alphabet = rnn_loader.alphabet  # alphabet
         self.q0 = build_start_state(rnn_loader)  # start state

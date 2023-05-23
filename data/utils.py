@@ -120,3 +120,7 @@ def save2csv(fpath, data, fname):
     data.to_csv(os.path.join(fpath, fname + ".csv"), index=False)
 
 
+def load_csv(fpath, fname):
+    data = pd.read_csv(os.path.join(fpath, fname + ".csv"))
+    return data
+

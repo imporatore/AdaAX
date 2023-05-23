@@ -1,0 +1,2 @@
+VOCAB_THRESHOLD = 1
+

@@ -1,6 +1,9 @@
+from __future__ import absolute_import
+
 import random
 
-from config import DATA_DIR, RANDOM_STATE
+from ..config import RANDOM_STATE
+from data.config import DATA_DIR
 from data.Grammars import *
 from data.utils import gen_dataset, save2pickle, save2csv
 
@@ -46,7 +49,7 @@ if __name__ == "__main__":
     yelp_train_df = pd.read_csv(os.path.join(DATA_DIR, "train.csv"), header=None)
     yelp_test_df = pd.read_csv(os.path.join(DATA_DIR, "test.csv"), header=None)
 
-    yelp_train_df.columns, yelp_test_df.columns = ['stars', 'expr'], ['stars', 'expr']  # name columns
+    yelp_train_df.columns, yelp_test_df.columns = ['stars', 'text'], ['stars', 'text']  # name columns
     yelp_review_df = pd.concat([yelp_train_df, yelp_test_df])  # merge two dataset
 
     # convert into binary label, 4-5 stars for 1 and 1-3 stars for 0
@@ -59,10 +62,10 @@ if __name__ == "__main__":
     # generate 20000 class-balanced sample
     yelp_pos_review = yelp_review_df.loc[yelp_review_df['label'] == 1].reset_index(drop=True)
     yelp_neg_review = yelp_review_df.loc[yelp_review_df['label'] == 0].reset_index(drop=True)
-    yelp_pos_review = yelp_pos_review.sample(10000, random_state=RANDOM_STATE)
-    yelp_neg_review = yelp_neg_review.sample(10000, random_state=RANDOM_STATE)
+    yelp_pos_review = yelp_pos_review.sample(10000, random_state=RANDOM_STATE).reset_index(drop=True)
+    yelp_neg_review = yelp_neg_review.sample(10000, random_state=RANDOM_STATE).reset_index(drop=True)
 
     yelp_review_balanced = pd.concat([yelp_pos_review, yelp_neg_review])
-    yelp_review_balanced = yelp_review_balanced.sample(20000)
+    yelp_review_balanced = yelp_review_balanced.sample(20000).reset_index(drop=True)
 
     save2csv(DATA_DIR, yelp_review_balanced, 'yelp_review_balanced')

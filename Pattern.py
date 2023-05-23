@@ -1,9 +1,11 @@
 import warnings
 
-from sklearn.cluster import KMeans
 import numpy as np
+from sklearn.cluster import KMeans
 
 from config import K, THETA, START_SYMBOL, START_PREFIX
+
+
 # todo: check if extracted pattern is unique
 
 
@@ -61,7 +63,7 @@ def pattern_extraction(rnn_loader):
         # ! Could be moved inside the for loop of cluster to save memory
         inds = {k: [i for i in ind if clusters[i, lvl - 1] == k] for k in range(-1, K)}
         # Sort cluster ids by the size each sub cluster
-        cluster_ids = sorted(range(-1, K), key=lambda x: len(inds[x]), reverse=True)
+        cluster_ids = sorted(inds.keys(), key=lambda x: len(inds[x]), reverse=True)
 
         for k in cluster_ids:
 
@@ -111,7 +113,6 @@ class PatternTree:
     def _build_tree(self, patterns, support):
         for p, s in zip(patterns, support):
             self._update(p[len(START_PREFIX):], s)  # if START_SYMBOL, the first symbol of pattern would be START_SYMBOL
-
 
     # Seems there can't be two same pattern extracted.
     # todo: modify the code.
