@@ -55,6 +55,9 @@ def build_vocab(sentence_list, min_count=0, vocab=None):
     Returns:
         vocab: a dictionary from words to indices and indices to words
     """
+    if vocab:
+        return vocab
+
     counter = Counter()
     for sentence in sentence_list:
         counter.update(sentence)

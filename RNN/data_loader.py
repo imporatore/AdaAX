@@ -6,7 +6,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 
-from config import RANDOM_STATE, START_PREFIX, VOCAB_THRESHOLD, SYNTHETIC_DATA_DIR, TOMITA_DATA_DIR, REAL_DATA_DIR
+from config import RANDOM_STATE, START_SYMBOL, VOCAB_THRESHOLD, SYNTHETIC_DATA_DIR, TOMITA_DATA_DIR, REAL_DATA_DIR
 from data.utils import load_pickle, load_csv
 from RNN.Helper_Functions import preprocess, tokenize, build_vocab, pad_seq2idx, Vocab
 
@@ -15,9 +15,10 @@ from RNN.Helper_Functions import preprocess, tokenize, build_vocab, pad_seq2idx,
 class SyntheticDataset(Dataset):
     """ Synthetic dataset for known alphabet."""
     
-    def __init__(self, data, alphabet, start_prefix, pad_len, vocab=None):
+    def __init__(self, data, alphabet, start_prefix, pad_len, vocab=None, pad=True):
         X, y = data
-        pad_len, pad_symbol = pad_len + len(start_prefix), '<pad>'
+        pad_len = pad_len + len(start_prefix)
+        pad_ = ['<pad>'] if pad else []
         tokens = [start_prefix + list(expr) for expr in X]
 
         # build vocabulary, add start symbol and padding symbol
@@ -25,7 +26,7 @@ class SyntheticDataset(Dataset):
             self.vocab = vocab
         else:
             self.vocab, self.alphabet = Vocab(), list(alphabet)
-            for s in [pad_symbol] + start_prefix + self.alphabet:
+            for s in pad_ + start_prefix + self.alphabet:
                 self.vocab.add_word(s)
 
         # pad to fix length & substitute with index
@@ -82,7 +83,8 @@ class PolarityDataset(Dataset):
         return self.data[i]
 
 
-def get_loader(fname, batch_size):
+def get_loader(fname, batch_size, start_symbol):
+    start_prefix = [start_symbol] if start_symbol else []
 
     if fname in ["synthetic_data_1", "synthetic_data_2", "tomita_data_1", "tomita_data_2"]:
         ftype = 'synthetic'
@@ -94,16 +96,16 @@ def get_loader(fname, batch_size):
     if ftype == 'synthetic':
 
         if fname in ["synthetic_data_1", "synthetic_data_2"]:
-            pad_len, data_dir = 15, SYNTHETIC_DATA_DIR
+            pad_len, data_dir, pad = 15, SYNTHETIC_DATA_DIR, False
         else:
-            pad_len, data_dir = 30, TOMITA_DATA_DIR
+            pad_len, data_dir, pad = 30, TOMITA_DATA_DIR, True
 
         X, y = load_pickle(data_dir, fname)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_STATE)
 
         alphabet = '01'
-        train_dataset = SyntheticDataset((X_train, y_train), alphabet, start_prefix=START_PREFIX, pad_len=pad_len)
-        test_dataset = SyntheticDataset((X_test, y_test), alphabet, START_PREFIX, pad_len, train_dataset.vocab)
+        train_dataset = SyntheticDataset((X_train, y_train), alphabet, start_prefix, pad_len=pad_len, pad=pad)
+        test_dataset = SyntheticDataset((X_test, y_test), alphabet, start_prefix, pad_len, train_dataset.vocab, pad=pad)
 
         train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
         test_dataloader = DataLoader(dataset=test_dataset,  batch_size=batch_size, shuffle=False, num_workers=4)
@@ -119,9 +121,9 @@ def get_loader(fname, batch_size):
         if fname == "yelp_review_balanced":
             pad_len = 25
 
-        train_dataset = PolarityDataset(train_df, pad_len, min_count=VOCAB_THRESHOLD, start_prefix=START_PREFIX)
-        valid_dataset = PolarityDataset(valid_df, pad_len, VOCAB_THRESHOLD, train_dataset.vocab, START_PREFIX)
-        test_dataset = PolarityDataset(test_df, pad_len, VOCAB_THRESHOLD, train_dataset.vocab, START_PREFIX)
+        train_dataset = PolarityDataset(train_df, pad_len, min_count=VOCAB_THRESHOLD, start_prefix=start_prefix)
+        valid_dataset = PolarityDataset(valid_df, pad_len, VOCAB_THRESHOLD, train_dataset.vocab, start_prefix)
+        test_dataset = PolarityDataset(test_df, pad_len, VOCAB_THRESHOLD, train_dataset.vocab, start_prefix)
 
         train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
         valid_dataloader = DataLoader(dataset=valid_dataset,  batch_size=batch_size, shuffle=False, num_workers=4)

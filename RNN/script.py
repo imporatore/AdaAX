@@ -1,4 +1,4 @@
-from config import RNN_MODEL_DIR, RNN_RESULT_DIR
+from config import RNN_MODEL_DIR, RNN_RESULT_DIR, START_SYMBOL
 from Helper_Functions import RNNConfig
 from main import main
 
@@ -6,24 +6,25 @@ from main import main
 DEFAULT_CONFIG = {"model_dir": RNN_MODEL_DIR,
                   "result_dir": RNN_RESULT_DIR,
                   "dropout_rate": 0.2,
-                  "batch_size": 100}
+                  "batch_size": 100,
+                  "start_symbol": START_SYMBOL}
 
 synthetic1_config = {"fname": "synthetic_data_1",
                      "hidden_size": 16,
                      "embedding_size": 16,
-                     "total_epoch": 10,
+                     "total_epoch": 5,  # 10 for RNN
                      "learning_rate": 0.01}
 
 synthetic2_config = {"fname": "synthetic_data_2",
                      "hidden_size": 16,
                      "embedding_size": 16,
-                     "total_epoch": 10,
-                     "learning_rate": 0.01}
+                     "total_epoch": 10,  # 5
+                     "learning_rate": 0.01}  # 0.005
 
 tomita1_config = {"fname": "tomita_data_1",
                   "hidden_size": 32,
                   "embedding_size": 32,
-                  "total_epoch": 10,
+                  "total_epoch": 5,  # 10 for RNN
                   "learning_rate": 0.005}
 
 tomita2_config = {}

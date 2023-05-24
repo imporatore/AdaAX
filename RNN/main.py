@@ -8,7 +8,7 @@ import numpy as np
 
 from tqdm import tqdm, trange
 
-from config import RANDOM_STATE, RNN_MODEL_DIR, RNN_RESULT_DIR
+from config import RANDOM_STATE, RNN_MODEL_DIR, RNN_RESULT_DIR, START_SYMBOL
 from data.utils import save2csv, save2npy
 from RNN.data_loader import get_loader
 from RNN.model import VanillaRNN, VanillaLSTMModel, VanillaGRUModel, GloveModel
@@ -168,7 +168,8 @@ def main(config):
     # load data
     train_data, valid_data, test_data, vocab = get_loader(
         fname=config.fname,
-        batch_size=config.batch_size
+        batch_size=config.batch_size,
+        start_symbol=config.start_symbol
     )
 
     # model
@@ -250,6 +251,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="rnn", choices=["rnn", "lstm", "gru", "glove-lstm"])
     parser.add_argument("--model_dir", type=str, default=RNN_MODEL_DIR)
     parser.add_argument("--result_dir", type=str, default=RNN_RESULT_DIR)
+    parser.add_argument("--start_symbol", type=str, default=START_SYMBOL)
     # parser.add_argument("--vocab_path", type=str, default='vocab.pkl')
 
     # model parameters
