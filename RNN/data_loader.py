@@ -11,6 +11,7 @@ from data.utils import load_pickle, load_csv
 from RNN.Helper_Functions import preprocess, tokenize, build_vocab, pad_seq2idx, Vocab
 
 
+# todo: synthetic doesn't need padding
 class SyntheticDataset(Dataset):
     """ Known alphabet
 

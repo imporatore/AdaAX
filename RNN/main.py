@@ -130,7 +130,7 @@ def predict(model, dataloader):
     return prediction
 
 
-def predict_and_save(model, dataloader, save_path=RNN_RESULT_DIR):
+def predict_and_save(save_path, fname, model, dataloader):
     with torch.no_grad():
         model.eval()
         prediction = []
@@ -154,7 +154,7 @@ def predict_and_save(model, dataloader, save_path=RNN_RESULT_DIR):
                 'predictions': output
             }
 
-            save2npy(save_path, data, f"data_{i}.npy")
+            save2npy(save_path, data, f"{fname}_data_{i}.npy")
 
     return prediction
 
@@ -200,21 +200,33 @@ def main(config):
 
     if valid_data:
         train_and_validate(model=model,
-                           model_path=os.path.join(config.model_dir, "{}-{}.pkl".format(config.fname, config.model)),
+                           model_path=os.path.join(config.model_dir, "{}_{}.pkl".format(config.fname, config.model)),
                            train_data=train_data,
                            valid_data=valid_data,
                            learning_rate=config.learning_rate,
                            total_epoch=config.total_epoch)
     else:
         train(model=model,
-              model_path=os.path.join(config.model_dir, "{}-{}.pkl".format(config.fname, config.model)),
+              model_path=os.path.join(config.model_dir, "{}_{}.pkl".format(config.fname, config.model)),
               train_data=train_data,
               learning_rate=config.learning_rate,
               total_epoch=config.total_epoch)
 
-    # model.load_state_dict(torch.load(os.path.join(config.model_dir, "{}-{}.pkl".format(config.fname, config.model))))
+    # model.load_state_dict(torch.load(os.path.join(config.model_dir, "{}_{}.pkl".format(config.fname, config.model))))
 
-    output = predict(model, test_data)
+    train_output = predict_and_save(save_path=config.result_dir,
+                                    fname="{}_{}_train".format(config.fname, config.model),
+                                    model=model,
+                                    dataloader=train_data)
+    if valid_data:
+        valid_output = predict_and_save(save_path=config.result_dir,
+                                        fname="{}_{}_valid".format(config.fname, config.model),
+                                        model=model,
+                                        dataloader=valid_data)
+    test_output = predict_and_save(save_path=config.result_dir,
+                                   fname="{}_{}_test".format(config.fname, config.model),
+                                   model=model,
+                                   dataloader=test_data)
     sub_df = pd.DataFrame()
     try:
         sub_df['text'] = test_data.dataset.df['text']
@@ -222,8 +234,8 @@ def main(config):
     except AttributeError:
         sub_df['expr'] = [dat[0] for dat in test_data.dataset.data]
         sub_df['label'] = [dat[1] for dat in test_data.dataset.data]
-    sub_df["rnn_predict"] = output
-    save2csv(RNN_RESULT_DIR, sub_df, "test_predict.csv")
+    sub_df["rnn_predict"] = test_output
+    save2csv(config.result_dir, sub_df, "{}_{}_test_predict.csv".format(config.fname, config.model))
 
 
 if __name__ == "__main__":
@@ -233,6 +245,7 @@ if __name__ == "__main__":
     parser.add_argument("--fname", type=str, default="yelp_review_balanced")
     parser.add_argument("--model", type=str, default="rnn", choices=["rnn", "lstm", "gru", "glove-lstm"])
     parser.add_argument("--model_dir", type=str, default=RNN_MODEL_DIR)
+    parser.add_argument("--result_dir", type=str, default=RNN_RESULT_DIR)
     # parser.add_argument("--vocab_path", type=str, default='vocab.pkl')
 
     # model parameters
