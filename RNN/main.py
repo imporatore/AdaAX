@@ -142,7 +142,10 @@ def predict_and_save(save_path, fname, model, dataloader):
             output, hidden = model(seq)
             seq = seq.cpu().numpy()
             hidden = hidden.cpu().numpy()
-            label = label.cpu().numpy().view(-1, 1)
+            try:
+                label = label.cpu().numpy().view(-1, 1)
+            except ValueError:
+                label = label.cpu().numpy()
             output = torch.sigmoid(output).round().cpu().numpy()
             prediction.extend(output.tolist())
 
