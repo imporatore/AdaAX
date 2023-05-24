@@ -11,12 +11,12 @@ def gen_seq_fixed_len(alphabet, N_samples, length):
     """ Generate sequence for given alphabet, sample num and length.
 
     Args:
-        - alphabet: str/list, symbols used when generating sequences
-        - N_samples: int, number of samples generated
-        - length: int, fix length for sequences generated
+        alphabet: str/list, symbols used when generating sequences
+        N_samples: int, number of samples generated
+        length: int, fix length for sequences generated
 
     Returns:
-        - seq: list, generated input sequence of shape (N_sample, length)
+        seq: list, generated input sequence of shape (N_sample, length)
     """
     if not isinstance(alphabet, str) and not isinstance(alphabet[0], str):
         alphabet = [str(s) for s in alphabet]
@@ -37,18 +37,18 @@ def gen_seq_fixed_len(alphabet, N_samples, length):
 
 
 def gen_seq(alphabet, lens, num_per_len):
-    """ Generate sequences for given alphabet and multiple lengths and sizes
+    """ Generate sequences for given alphabet and multiple lengths and sizes.
 
     Note that the actual size of samples generated may less than len(lens) * num_per_len,
     since that for smaller length the possible permutation num may be inadequate.
 
     Args:
-        - alphabet: list, symbols used when generating sequences
-        - lens: list, lengths for sequences generated
-        - num_per_len: int, sample num per length
+        alphabet: list, symbols used when generating sequences
+        lens: list, lengths for sequences generated
+        num_per_len: int, sample num per length
 
     Returns:
-        - seq: list, generated input sequence of shape (N_sample, length)
+        seq: list, generated input sequence of shape (N_sample, length)
     """
     seq = []
     for l in lens:
@@ -66,15 +66,15 @@ def gen_dataset(alphabet, rule, lens, num_per_len, class_balance=True):
     due to inadequate possible permutations and class balance procedure.
 
     Args:
-        - alphabet: list, symbols used when generating sequences
-        - rule: func, target is positive (1) iff rule(expr)
-        - lens: list, lengths for sequences generated
-        - num_per_len: int, sample num per length
-        - class_balance: bool, if dataset generated should be class balanced
+        alphabet: list, symbols used when generating sequences
+        rule: func, target is positive (1) iff rule(expr)
+        lens: list, lengths for sequences generated
+        num_per_len: int, sample num per length
+        class_balance: bool, if dataset generated should be class balanced
 
     Returns:
-        - X: list, generated class-balanced input sequence
-        - y: list, labels evaluated using func 'rule'
+        X: list, generated class-balanced input sequence
+        y: list, labels evaluated using func 'rule'
     """
 
     if isinstance(lens, int):

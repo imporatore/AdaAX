@@ -31,7 +31,7 @@ tomita2_config = {}
 yelp_config = {"fname": "yelp_review_balanced",
                "hidden_size": 256,
                "embedding_size": 100,
-               "total_epoch": 10,
+               "total_epoch": 30,
                "learning_rate": 0.001}
 
 

@@ -8,13 +8,22 @@ random.seed(RANDOM_STATE)
 
 
 def gen_synthetic_dataset(path=SYNTHETIC_DATA_DIR, ftype='pickle'):
+    """
+    Generate
+    Args:
+        path:
+        ftype:
+
+    Returns:
+
+    """
     synthetic_data_1 = gen_dataset("01", rule1, 15, 20000, class_balance=False)
     synthetic_data_2 = gen_dataset("01", rule2, 15, 20000, class_balance=False)
     if ftype == 'pickle':
         save2pickle(path, synthetic_data_1, "synthetic_data_1")
         save2pickle(path, synthetic_data_2, "synthetic_data_2")
         return
-    elif ftype in ['pd', 'pandas', 'csv']:
+    elif ftype == 'csv':
         save2csv(path, synthetic_data_1, "synthetic_data_1")
         save2csv(path, synthetic_data_2, "synthetic_data_2")
         return
@@ -28,7 +37,7 @@ def gen_tomita_dataset(path=TOMITA_DATA_DIR, ftype='pickle'):
         save2pickle(path, tomita_data_1, "tomita_data_1")
         save2pickle(path, tomita_data_2, "tomita_data_2")
         return
-    elif ftype in ['pd', 'pandas', 'csv']:
+    elif ftype == 'csv':
         save2csv(path, tomita_data_1, "tomita_data_1")
         save2csv(path, tomita_data_2, "tomita_data_2")
         return

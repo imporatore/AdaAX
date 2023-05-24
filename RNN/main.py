@@ -4,6 +4,7 @@ import os
 import torch
 import torch.nn as nn
 import pandas as pd
+import numpy as np
 
 from tqdm import tqdm, trange
 
@@ -27,7 +28,7 @@ def train_and_validate(model, model_path, train_data, valid_data, learning_rate,
 
     for epoch in trange(total_epoch):
         correct, total = 0, 0
-        train_data = tqdm(train_data)
+        # train_data = tqdm(train_data)
         model.train()
 
         if hits == 3:
@@ -70,7 +71,7 @@ def train(model, model_path, train_data, learning_rate, total_epoch):
 
     for epoch in trange(total_epoch):
         correct, total = 0, 0
-        train_data = tqdm(train_data)
+        # train_data = tqdm(train_data)
         for i, (seq, label) in enumerate(train_data):
 
             seq = seq.to(device)
@@ -133,7 +134,7 @@ def predict(model, dataloader):
 def predict_and_save(save_path, fname, model, dataloader):
     with torch.no_grad():
         model.eval()
-        prediction = []
+        prediction, res = [], {}
         for i, (seq, label) in enumerate(tqdm(dataloader)):
 
             # convert to cuda
@@ -141,23 +142,18 @@ def predict_and_save(save_path, fname, model, dataloader):
 
             output, hidden = model(seq)
             seq = seq.cpu().numpy()
-            hidden = hidden.cpu().numpy()
-            try:
-                label = label.cpu().numpy().view(-1, 1)
-            except ValueError:
-                label = label.cpu().numpy()
-            output = torch.sigmoid(output).round().cpu().numpy()
-            prediction.extend(output.tolist())
+            hidden = hidden.cpu().numpy().squeeze()
+            label = label.cpu().numpy()
+            output = torch.sigmoid(output).cpu().numpy().squeeze()
+            prediction.extend(output.round().tolist())
 
             # Package data
-            data = {
-                'input': seq,
-                'hidden': hidden,
-                'labels': label,
-                'predictions': output
-            }
+            res['input'] = np.concatenate((res.get('input', np.ndarray(shape=(0, *seq.shape[1:]))), seq), axis=0)
+            res['hidden'] = np.concatenate((res.get('hidden', np.ndarray(shape=(0, *hidden.shape[1:]))), seq), axis=0)
+            res['output'] = np.concatenate((res.get('output', np.ndarray(shape=(0, *output.shape[1:]))), seq), axis=0)
+            res['labels'] = np.concatenate((res.get('labels', np.ndarray(shape=(0, *label.shape[1:]))), seq), axis=0)
 
-            save2npy(save_path, data, f"{fname}_data_{i}.npy")
+    save2npy(save_path, res, f"{fname}_data")
 
     return prediction
 
@@ -166,6 +162,8 @@ def main(config):
     # create model directory
     if not os.path.exists(config.model_dir):
         os.makedirs(config.model_dir)
+
+    result_dir = os.path.join(config.result_dir, config.fname, config.model)
 
     # load data
     train_data, valid_data, test_data, vocab = get_loader(
@@ -199,7 +197,7 @@ def main(config):
                            config.dropout_rate,
                            glove).to(device)
 
-    print("\nmodel loaded...")
+    print("\n{} model for {} loaded...".format(config.model, config.fname))
 
     if valid_data:
         train_and_validate(model=model,
@@ -217,17 +215,17 @@ def main(config):
 
     # model.load_state_dict(torch.load(os.path.join(config.model_dir, "{}_{}.pkl".format(config.fname, config.model))))
 
-    train_output = predict_and_save(save_path=config.result_dir,
-                                    fname="{}_{}_train".format(config.fname, config.model),
+    train_output = predict_and_save(save_path=result_dir,
+                                    fname="train",
                                     model=model,
                                     dataloader=train_data)
     if valid_data:
-        valid_output = predict_and_save(save_path=config.result_dir,
-                                        fname="{}_{}_valid".format(config.fname, config.model),
+        valid_output = predict_and_save(save_path=result_dir,
+                                        fname="valid",
                                         model=model,
                                         dataloader=valid_data)
-    test_output = predict_and_save(save_path=config.result_dir,
-                                   fname="{}_{}_test".format(config.fname, config.model),
+    test_output = predict_and_save(save_path=result_dir,
+                                   fname="test",
                                    model=model,
                                    dataloader=test_data)
     sub_df = pd.DataFrame()
@@ -238,7 +236,7 @@ def main(config):
         sub_df['expr'] = [dat[0] for dat in test_data.dataset.data]
         sub_df['label'] = [dat[1] for dat in test_data.dataset.data]
     sub_df["rnn_predict"] = test_output
-    save2csv(config.result_dir, sub_df, "{}_{}_test_predict.csv".format(config.fname, config.model))
+    save2csv(result_dir, sub_df, "test_predict")
 
 
 if __name__ == "__main__":
