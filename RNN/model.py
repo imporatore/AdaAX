@@ -36,13 +36,13 @@ class VanillaLSTMModel(nn.Module):
         self.dropout = nn.Dropout(dropout_rate)
         self.linear = nn.Linear(hidden_size, output_size)
 
-    def forward(self, input, lengths):
+    def forward(self, input):
         embeddings = self.embedding(input)
         embeddings = self.dropout(embeddings)
         # lstm_out: tensor containing all output hidden states, for each timestep. shape: (length, batch, hidden_size)
         # hidden_state: tensor containing the hidden state for last timestep. shape: (1, batch, hidden_size)
         # cell state: tensor containing the cell state for last timestep. shape: (1, batch, hidden_size)
-        lstm_out, (hidden_state, cell_state) = self.lstm(embeddings, batch_first=True)
+        lstm_out, (hidden_state, cell_state) = self.lstm(embeddings)
         out = self.linear(hidden_state.squeeze(0))
         return out, hidden_state
 
@@ -58,10 +58,10 @@ class VanillaGRUModel(nn.Module):
         self.dropout = nn.Dropout(dropout_rate)
         self.linear = nn.Linear(hidden_size, output_size)
 
-    def forward(self, input, lengths):
+    def forward(self, input):
         embeddings = self.embedding(input)
         embeddings = self.dropout(embeddings)
-        gru_out, hidden_state = self.gru(embeddings, batch_first=True)
+        gru_out, hidden_state = self.gru(embeddings)
         out = self.linear(hidden_state.squeeze(0))
         return out, hidden_state
 
@@ -81,11 +81,11 @@ class GloveModel(nn.Module):
         self.dropout = nn.Dropout(dropout_rate)
         self.linear = nn.Linear(3 * hidden_size, output_size)
 
-    def forward(self, input, lengths):
+    def forward(self, input):
         embeddings = self.embedding(input)
         embeddings = self.dropout(embeddings)
 
-        lstm_out, (hidden_state, cell_state) = self.lstm(embeddings, num_layers=2, batch_first=True)
+        lstm_out, (hidden_state, cell_state) = self.lstm(embeddings, num_layers=2)
 
         # pool the lengths
         avg_pool = F.adaptive_avg_pool1d(lstm_out.permute((1, 2, 0)), 1).squeeze()

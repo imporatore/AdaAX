@@ -115,44 +115,46 @@ def validate(model, valid_data):
 
 
 def predict(model, dataloader):
-    model.eval()
-    prediction = []
-    for i, (seq, _) in enumerate(tqdm(dataloader)):
+    with torch.no_grad():
+        model.eval()
+        prediction = []
+        for i, (seq, _) in enumerate(tqdm(dataloader)):
 
-        # convert to cuda
-        seq = seq.to(device)
+            # convert to cuda
+            seq = seq.to(device)
 
-        output, hidden = model(seq)
-        output = torch.sigmoid(output).round().cpu().numpy()
-        prediction.extend(output.tolist())
+            output, hidden = model(seq)
+            output = torch.sigmoid(output).round().cpu().numpy()
+            prediction.extend(output.tolist())
 
     return prediction
 
 
 def predict_and_save(model, dataloader, save_path=RNN_RESULT_DIR):
-    model.eval()
-    prediction = []
-    for i, (seq, label) in enumerate(tqdm(dataloader)):
+    with torch.no_grad():
+        model.eval()
+        prediction = []
+        for i, (seq, label) in enumerate(tqdm(dataloader)):
 
-        # convert to cuda
-        seq = seq.to(device)
+            # convert to cuda
+            seq = seq.to(device)
 
-        output, hidden = model(seq)
-        seq = seq.cpu().numpy()
-        hidden = hidden.cpu().numpy()
-        label = label.cpu().numpy().view(-1, 1)
-        output = torch.sigmoid(output).round().cpu().numpy()
-        prediction.extend(output.tolist())
+            output, hidden = model(seq)
+            seq = seq.cpu().numpy()
+            hidden = hidden.cpu().numpy()
+            label = label.cpu().numpy().view(-1, 1)
+            output = torch.sigmoid(output).round().cpu().numpy()
+            prediction.extend(output.tolist())
 
-        # Package data
-        data = {
-            'input': seq,
-            'hidden': hidden,
-            'labels': label,
-            'predictions': output
-        }
+            # Package data
+            data = {
+                'input': seq,
+                'hidden': hidden,
+                'labels': label,
+                'predictions': output
+            }
 
-        save2npy(save_path, data, f"data_{i}.npy")
+            save2npy(save_path, data, f"data_{i}.npy")
 
     return prediction
 
@@ -214,8 +216,12 @@ def main(config):
 
     output = predict(model, test_data)
     sub_df = pd.DataFrame()
-    sub_df['text'] = test_data.dataset.df['text']
-    sub_df['label'] = test_data.dataset.df['label']
+    try:
+        sub_df['text'] = test_data.dataset.df['text']
+        sub_df['label'] = test_data.dataset.df['label']
+    except AttributeError:
+        sub_df['expr'] = [dat[0] for dat in test_data.dataset.data]
+        sub_df['label'] = [dat[1] for dat in test_data.dataset.data]
     sub_df["rnn_predict"] = output
     save2csv(RNN_RESULT_DIR, sub_df, "test_predict.csv")
 
@@ -224,7 +230,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # setup parameters
-    parser.add_argument("--fname", type=str)
+    parser.add_argument("--fname", type=str, default="yelp_review_balanced")
     parser.add_argument("--model", type=str, default="rnn", choices=["rnn", "lstm", "gru", "glove-lstm"])
     parser.add_argument("--model_dir", type=str, default=RNN_MODEL_DIR)
     # parser.add_argument("--vocab_path", type=str, default='vocab.pkl')
