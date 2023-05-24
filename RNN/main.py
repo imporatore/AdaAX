@@ -53,7 +53,7 @@ def train_and_validate(model, model_path, train_data, valid_data, learning_rate,
             total += output.size(0)
 
         # print epoch accuracy
-        print("training accuracy: {}/{} ".format(correct, total), correct / total)
+        print("\nEpoch {} training accuracy: {}/{} ".format(epoch, correct, total), correct / total)
         valid_acc = validate(model, valid_data)
 
         # keep best acc model
@@ -89,7 +89,7 @@ def train(model, model_path, train_data, learning_rate, total_epoch):
             total += output.size(0)
 
         # print epoch accuracy
-        print("\ntraining accuracy: {}/{} ".format(correct, total), correct / total)
+        print("\nEpoch {} training accuracy: {}/{} ".format(epoch, correct, total), correct / total)
 
     torch.save(model.state_dict(), model_path)
 
@@ -111,7 +111,7 @@ def validate(model, valid_data):
 
             correct += (output == label).sum().item()
             total += output.size(0)
-    print("validation accuracy: {}/{} ".format(correct, total), correct / total)
+    print("Validation accuracy: {}/{} ".format(correct, total), correct / total)
     return correct / total
 
 
@@ -131,7 +131,7 @@ def predict(model, dataloader):
     return prediction
 
 
-def predict_and_save(save_path, fname, model, dataloader):
+def predict_and_save(save_path, fname, model, dataloader, vocab):
     with torch.no_grad():
         model.eval()
         prediction, res = [], {}
@@ -149,11 +149,11 @@ def predict_and_save(save_path, fname, model, dataloader):
 
             # Package data
             res['input'] = np.concatenate((res.get('input', np.ndarray(shape=(0, *seq.shape[1:]))), seq), axis=0)
-            res['hidden'] = np.concatenate((res.get('hidden', np.ndarray(shape=(0, *hidden.shape[1:]))), seq), axis=0)
-            res['output'] = np.concatenate((res.get('output', np.ndarray(shape=(0, *output.shape[1:]))), seq), axis=0)
-            res['labels'] = np.concatenate((res.get('labels', np.ndarray(shape=(0, *label.shape[1:]))), seq), axis=0)
+            res['hidden'] = np.concatenate((res.get('hidden', np.ndarray(shape=(0, *hidden.shape[1:]))), hidden), axis=0)
+            res['output'] = np.concatenate((res.get('output', np.ndarray(shape=(0, *output.shape[1:]))), output), axis=0)
+            res['labels'] = np.concatenate((res.get('labels', np.ndarray(shape=(0, *label.shape[1:]))), label), axis=0)
 
-    save2npy(save_path, res, f"{fname}_data")
+    save2npy(save_path, (res, vocab), f"{fname}_data")
 
     return prediction
 
@@ -218,16 +218,19 @@ def main(config):
     train_output = predict_and_save(save_path=result_dir,
                                     fname="train",
                                     model=model,
-                                    dataloader=train_data)
+                                    dataloader=train_data,
+                                    vocab=vocab)
     if valid_data:
         valid_output = predict_and_save(save_path=result_dir,
                                         fname="valid",
                                         model=model,
-                                        dataloader=valid_data)
+                                        dataloader=valid_data,
+                                        vocab=vocab)
     test_output = predict_and_save(save_path=result_dir,
                                    fname="test",
                                    model=model,
-                                   dataloader=test_data)
+                                   dataloader=test_data,
+                                   vocab=vocab)
     sub_df = pd.DataFrame()
     try:
         sub_df['text'] = test_data.dataset.df['text']

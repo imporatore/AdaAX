@@ -35,7 +35,7 @@ yelp_config = {"fname": "yelp_review_balanced",
                "learning_rate": 0.001}
 
 
-def run(name, type):
+def run(name, type, config=None):
     cfg = RNNConfig(DEFAULT_CONFIG)
 
     if name == 'synthetic1':
@@ -59,6 +59,9 @@ def run(name, type):
         cfg.update({"model": 'gru'})
     else:
         raise ValueError('Model type %s not found.' % type)
+
+    if config:
+        cfg.update(config)
 
     main(cfg)
 

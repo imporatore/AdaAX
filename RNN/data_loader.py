@@ -11,11 +11,10 @@ from data.utils import load_pickle, load_csv
 from RNN.Helper_Functions import preprocess, tokenize, build_vocab, pad_seq2idx, Vocab
 
 
-# todo: synthetic doesn't need padding
+# todo: synthetic data doesn't need padding
 class SyntheticDataset(Dataset):
-    """ Known alphabet
-
-    """
+    """ Synthetic dataset for known alphabet."""
+    
     def __init__(self, data, alphabet, start_prefix, pad_len, vocab=None):
         X, y = data
         pad_len, pad_symbol = pad_len + len(start_prefix), '<pad>'

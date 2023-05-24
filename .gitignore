@@ -15,10 +15,9 @@ __pycache__/*.pyc
 /RNN/yelp_classification_GPT4.ipynb
 
 /data/__pycache__/
+/data/rnn_result/
 /data/raw_data/*.csv
 /data/synthetic_data/*.pickle
 /data/tomita_data/*.pickle
 /data/real_data/*.csv
 /data/rnn_checkpoints/*.pkl
-/data/rnn_result/*.csv
-/data/rnn_result/*.npy

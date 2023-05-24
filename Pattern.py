@@ -14,16 +14,16 @@ def pattern_extraction(rnn_loader):
     """ Extract patterns by DFS backtracking at the level of core(focal) sets.
 
         Args:
-            - rnn_loader
+            rnn_loader
 
         Params:
-            - K: Initial cluster numbers, determined by elbow method
-            - THETA: threshold for pruning focal set(split by clusters)
+            K: Initial cluster numbers, determined by elbow method
+            THETA: threshold for pruning focal set(split by clusters)
 
         Return:
-            - patterns: list[list], list of patterns, each pattern is a list of symbols which
+            patterns: list[list], list of patterns, each pattern is a list of symbols which
                 leads to a core(pure) set, and finally reaches accept state.
-            - support: list[float], data support(percentage in the sample) for corresponding pattern
+            support: list[float], data support(percentage in the sample) for corresponding pattern
         """
 
     def _clustering():
@@ -48,9 +48,9 @@ def pattern_extraction(rnn_loader):
         Recursively applied to the previous 'focal set' and search for patterns by DFS.
 
         Args:
-            - ind: list, indexes in the input sequence of the hidden states in current 'focal set'
-            - lvl: int, current level of the focal set, 0 stands for start state and L-1 stands for accept state
-            - p: list, current extracted pattern
+            ind: list, indexes in the input sequence of the hidden states in current 'focal set'
+            lvl: int, current level of the focal set, 0 stands for start state and L-1 stands for accept state
+            p: list, current extracted pattern
         """
         # Reaches start state and add pattern
         # When start symbol was added,

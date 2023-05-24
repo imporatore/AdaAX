@@ -19,16 +19,21 @@ def preprocess(text):
     return text.replace("'s", "").replace("-", "")  # Remove 's -
 
 
-# torchtext.data.utils.get_tokenizer
+# todo: use torchtext.data.utils.get_tokenizer instead
 def tokenize(text):
-    '''
-    :param text: a doc with multiple sentences, type: str
-    return a word list, type: list
-    https://textminingonline.com/dive-into-nltk-part-ii-sentence-tokenize-and-word-tokenize
-    e.g.
-    Input: 'It is a nice day. I am happy.'
-    Output: ['it', 'is', 'a', 'nice', 'day', 'i', 'am', 'happy']
-    '''
+    """ Return a tokenized word list for given text.
+
+    Args:
+        text: str, a doc with multiple sentences
+
+
+    Returns:
+        tokens: list, word list
+
+    Example:
+        Input: 'It is a nice day. I am happy.'
+        Output: ['it', 'is', 'a', 'nice', 'day', 'i', 'am', 'happy']
+    """
     tokens = []
     for word in nltk.casual_tokenize(text, preserve_case=False):
         if word not in stop_words and not word.isnumeric():
@@ -36,12 +41,19 @@ def tokenize(text):
     return tokens
 
 
+# todo: for given alphabet (synthetic dataset), <unk> is unnecessary
 def build_vocab(sentence_list, min_count=0, vocab=None):
-    """
-    :param sentence_list: an iterable object with multiple words in each sub-list, type: iterable object
-    :param min_count: minimum number of a word's count to be included into the vocabulary object type: int
-    :param vocab: a Vocab object, type: object
-    :return: a dictionary from words to indices and indices to words
+    """ Build vocabulary on given sentence list.
+
+    Args:
+        sentence_list: iterable object, an iterable object with multiple words in each sub-list
+        vocab
+
+    Params:
+        min_count:int, minimum number of a word's count to be added into the vocabulary
+
+    Returns:
+        vocab: a dictionary from words to indices and indices to words
     """
     counter = Counter()
     for sentence in sentence_list:
@@ -66,11 +78,15 @@ def build_vocab(sentence_list, min_count=0, vocab=None):
 
 
 def pad_seq2idx(data, pad_len, vocab_dict):
-    """
-    :param data: a list of words, type: list
-    :param pad_len: the length of sequences,, type: int
-    :param vocab_dict: a dict from words to indices, type: dict
-    return a dense sequence matrix whose elements are indices of words,
+    """ Padding sequence and substitude words with their index in the vocabulary.
+
+    Args:
+        data: list, list of words
+        pad_len: int, padding length of sequences
+        vocab_dict: dict, vocabulary dict from words to indices
+
+    Returns
+        data_matrix: a dense sequence matrix whose elements are indices of words
     """
     data_matrix = np.zeros((len(data), pad_len), dtype=int)
     for i, doc in enumerate(data):
@@ -83,19 +99,35 @@ def pad_seq2idx(data, pad_len, vocab_dict):
 
 
 class Vocab(object):
+    """ Helper class for vocabulary dict."""
+
     def __init__(self):
-        self.word2idx = dict()
-        self.vocab_size = 0
+        self.word2idx = dict()  # word to index dict
+        self.words = []  # index to word
+        self.vocab_size = 0  # size of vocabulary dict
 
     def __len__(self):
         return len(self.word2idx)
 
     def add_word(self, word):
-        if word not in self.word2idx:
+        if word not in self.word2idx:  # update new word
             self.word2idx[word] = self.vocab_size
+            self.words.append(word)
             self.vocab_size += 1
 
     def get_pretrained_embedding(self, name, embedding_dim):
+        """ Fetch pretrained embeddings when building vocab.
+
+        Currently available pretrained embeddings: 'glove' & 'fasttext'.
+        Currently not in use.
+
+        Args:
+            name: str, choice: ['glove', 'fasttext'], type of pretrained embeddings used.
+            embedding_dim: int, embedding dimension.
+
+        Return
+            embed: torch.tensor, pretrained embeddings fetched.Words not in the pretrained embeddings are initialized randomly.
+        """
         if name == 'glove':
             pretrained_type = vocab.GloVe(name='42B', dim=embedding_dim)
         elif name == 'fasttext':
@@ -122,8 +154,10 @@ class Vocab(object):
 
 
 class RNNConfig:
+    """ Helper class for model configuration."""
 
     def __init__(self, config_dict):
+        # config_dict: a dict object holding configurations
         self.config = config_dict
 
     def __getattr__(self, item):

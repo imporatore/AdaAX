@@ -38,10 +38,10 @@ class DFA:
         """ Add new? pattern to DFA
 
         Args:
-            - p: list, pattern is a list of symbols
+            p: list, pattern is a list of symbols
 
         Returns:
-            - Q_new: list, new states (pure sets) added by the pattern
+            Q_new: list, new states (pure sets) added by the pattern
         """
         q1 = self.q0
         Q_new = []  # New pure sets to add
@@ -63,11 +63,11 @@ class DFA:
         """ Build DFA using extracted patterns
 
         Args:
-            - patterns: list[list], list of patterns
+            patterns: list[list], list of patterns
 
         Params:
-            - TAU: threshold for neighbour distance
-            - DELTA: threshold for merging fidelity loss
+            TAU: threshold for neighbour distance
+            DELTA: threshold for merging fidelity loss
         """
         for p in patterns:
             # list of new states created by pattern
@@ -97,11 +97,11 @@ class DFA:
         Notice that if the child state not consistent, they will also be merged.
 
         Args:
-            - state1:
-            - state2:
+            state1:
+            state2:
 
         Returns:
-            - new_dfa: new DFA after merging state1 with state2 in the existing DFA
+            new_dfa: new DFA after merging state1 with state2 in the existing DFA
         """
         # todo: forbid merging accept state
         # todo: add threshold for merging accept state

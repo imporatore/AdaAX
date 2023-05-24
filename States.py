@@ -17,8 +17,8 @@ class PureSet:
         """
 
         Args:
-            - rnn_loader
-            - prefix: list, a list of symbols which form the path from the start h0 to this 'pure set'.
+            rnn_loader
+            prefix: list, a list of symbols which form the path from the start h0 to this 'pure set'.
         """
         self._prefix = prefix
         self._h = rnn_loader.rnn_hidden_values(prefix)  # hidden value
@@ -39,11 +39,11 @@ class State(PureSet):
         """
 
         Args:
-            - rnn_loader
-            - prefix: list, a list of symbols which initialize the State (as a PureSet).
+            rnn_loader
+            prefix: list, a list of symbols which initialize the State (as a PureSet).
                 - The first prefix upon which the PureSet is built.
                 - Also, the hidden value of this PureSet is evaluated on this prefix.
-            - prev_state: the previous state which transit into this State by symbol prefix[-1],
+            prev_state: the previous state which transit into this State by symbol prefix[-1],
                 - also the state which represent prefix prefix[:-1].
         """
         # todo: hidden state value is set to be a constant and never updates, even after merging.
@@ -63,7 +63,7 @@ class State(PureSet):
         """ All prefixes which goes to the state.
 
         Returns:
-            - prefixes: list[list], list of prefixes, where each prefix is a list of symbols
+            prefixes: list[list], list of prefixes, where each prefix is a list of symbols
         """
         if self._prefix == [START_SYMBOL]:  # start state
             return [[START_SYMBOL]]
@@ -85,16 +85,16 @@ def build_start_state(rnn_loader):
     """ Build start state for the DFA.
 
     Args:
-        - rnn_loader
+        rnn_loader
 
     Params:
-        - START_SYMBOL: symbol for represent sentence start,
+        START_SYMBOL: symbol for represent sentence start,
             added to all input sequence for a uniform start sign and hidden value.
             - str, symbol of expression start, should be added to RNN training (thus alphabet, input sequence & hidden)
             - None, if no start sign is added
 
     Returns:
-        - h0, a 'PureSet'(State) of start state.
+        h0, a 'PureSet'(State) of start state.
     """
     if START_SYMBOL:
         return State(rnn_loader, [START_SYMBOL])
@@ -106,10 +106,10 @@ def build_accept_state(rnn_loader):
     """ Build accept state for the DFA.
 
     Args:
-        - rnn_loader
+        rnn_loader
 
     Returns:
-        - h0, a 'PureSet'(State) of start state.
+        h0, a 'PureSet'(State) of start state.
     """
     F = State(rnn_loader, None)
 

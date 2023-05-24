@@ -8,14 +8,11 @@ random.seed(RANDOM_STATE)
 
 
 def gen_synthetic_dataset(path=SYNTHETIC_DATA_DIR, ftype='pickle'):
-    """
-    Generate
+    """ Generate fixed length(15) synthetic dataset from rule1 and rule2. 20000 samples.
+
     Args:
-        path:
-        ftype:
-
-    Returns:
-
+        path: str, directory for the generated dataset.
+        ftype: str, choice: ['pickle', 'csv'], method of saving the dataset: pickle or pandas
     """
     synthetic_data_1 = gen_dataset("01", rule1, 15, 20000, class_balance=False)
     synthetic_data_2 = gen_dataset("01", rule2, 15, 20000, class_balance=False)
@@ -31,6 +28,17 @@ def gen_synthetic_dataset(path=SYNTHETIC_DATA_DIR, ftype='pickle'):
 
 
 def gen_tomita_dataset(path=TOMITA_DATA_DIR, ftype='pickle'):
+    """ Generate class-balanced Tomita grammars from Tomita4 and Tomita7.
+
+    Variable length range from 0 to 15, and 20, 25, 30. 5000 samples searched for each length.
+
+    Note:
+        Due to the grammar nature, Tomita7 only has around 3000 samples.
+        
+    Args:
+        path: str, directory for the generated dataset.
+        ftype: str, choice: ['pickle', 'csv'], method of saving the dataset: pickle or pandas
+    """
     tomita_data_1 = gen_dataset("01", tomita4, list(range(15)) + [15, 20, 25, 30], 5000)
     tomita_data_2 = gen_dataset("01", tomita7, list(range(15)) + [15, 20, 25, 30], 5000)
     if ftype == 'pickle':
