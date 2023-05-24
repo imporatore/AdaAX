@@ -1,4 +1,5 @@
 import warnings
+import os
 
 import torch
 import numpy as np
@@ -6,8 +7,8 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 
-from config import RANDOM_STATE, START_SYMBOL, VOCAB_THRESHOLD, SYNTHETIC_DATA_DIR, TOMITA_DATA_DIR, REAL_DATA_DIR
-from data.utils import load_pickle, load_csv
+from config import RANDOM_STATE, VOCAB_THRESHOLD, SYNTHETIC_DATA_DIR, TOMITA_DATA_DIR, REAL_DATA_DIR, VOCAB_DIR, DATALOADER_DIR
+from data.utils import load_pickle, load_csv, save2pickle
 from RNN.Helper_Functions import preprocess, tokenize, build_vocab, pad_seq2idx, Vocab
 
 
@@ -21,10 +22,10 @@ class SyntheticDataset(Dataset):
         pad_ = ['<pad>'] if pad else []
         tokens = [start_prefix + list(expr) for expr in X]
 
-        # build vocabulary, add start symbol and padding symbol
         if vocab:
             self.vocab = vocab
         else:
+            # build vocabulary, add start symbol and padding symbol
             self.vocab, self.alphabet = Vocab(), list(alphabet)
             for s in pad_ + start_prefix + self.alphabet:
                 self.vocab.add_word(s)
@@ -83,7 +84,22 @@ class PolarityDataset(Dataset):
         return self.data[i]
 
 
-def get_loader(fname, batch_size, start_symbol):
+def get_loader(fname, batch_size, start_symbol, load_vocab, save_vocab, load_loader, save_loader):
+
+    if load_loader:
+        try:
+            return load_pickle(VOCAB_DIR, fname)
+        except OSError:
+            pass
+
+    loaded_vocab = None
+
+    if load_vocab:
+        try:
+            loaded_vocab = load_pickle(VOCAB_DIR, fname)
+        except FileNotFoundError:
+            pass
+
     start_prefix = [start_symbol] if start_symbol else []
 
     if fname in ["synthetic_data_1", "synthetic_data_2", "tomita_data_1", "tomita_data_2"]:
@@ -104,13 +120,13 @@ def get_loader(fname, batch_size, start_symbol):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_STATE)
 
         alphabet = '01'
-        train_dataset = SyntheticDataset((X_train, y_train), alphabet, start_prefix, pad_len=pad_len, pad=pad)
-        test_dataset = SyntheticDataset((X_test, y_test), alphabet, start_prefix, pad_len, train_dataset.vocab, pad=pad)
+        train_dataset = SyntheticDataset((X_train, y_train), alphabet, start_prefix, pad_len, loaded_vocab, pad)
+        test_dataset = SyntheticDataset((X_test, y_test), alphabet, start_prefix, pad_len, train_dataset.vocab, pad)
 
         train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
         test_dataloader = DataLoader(dataset=test_dataset,  batch_size=batch_size, shuffle=False, num_workers=4)
 
-        return train_dataloader, None, test_dataloader, train_dataset.vocab
+        dataloaders = (train_dataloader, None, test_dataloader, train_dataset.vocab)
 
     else:
         data = load_csv(REAL_DATA_DIR, fname)
@@ -121,7 +137,7 @@ def get_loader(fname, batch_size, start_symbol):
         if fname == "yelp_review_balanced":
             pad_len = 25
 
-        train_dataset = PolarityDataset(train_df, pad_len, min_count=VOCAB_THRESHOLD, start_prefix=start_prefix)
+        train_dataset = PolarityDataset(train_df, pad_len, VOCAB_THRESHOLD, loaded_vocab, start_prefix)
         valid_dataset = PolarityDataset(valid_df, pad_len, VOCAB_THRESHOLD, train_dataset.vocab, start_prefix)
         test_dataset = PolarityDataset(test_df, pad_len, VOCAB_THRESHOLD, train_dataset.vocab, start_prefix)
 
@@ -129,4 +145,12 @@ def get_loader(fname, batch_size, start_symbol):
         valid_dataloader = DataLoader(dataset=valid_dataset,  batch_size=batch_size, shuffle=False, num_workers=4)
         test_dataloader = DataLoader(dataset=test_dataset,  batch_size=batch_size, shuffle=False, num_workers=4)
 
-        return train_dataloader, valid_dataloader, test_dataloader, train_dataset.vocab
+        dataloaders = (train_dataloader, valid_dataloader, test_dataloader, train_dataset.vocab)
+
+    if (loaded_vocab is None) and save_vocab:
+        save2pickle(VOCAB_DIR, train_dataset.vocab)
+
+    if save_loader:
+        save2pickle(DATALOADER_DIR, dataloaders)
+
+    return dataloaders

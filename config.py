@@ -11,6 +11,8 @@ SYNTHETIC_DATA_DIR = os.path.join(DATA_DIR, 'synthetic_data')
 TOMITA_DATA_DIR = os.path.join(DATA_DIR, 'tomita_data')
 REAL_DATA_DIR = os.path.join(DATA_DIR, 'real_data')
 
+VOCAB_DIR = os.path.join(DATA_DIR, 'vocab')
+DATALOADER_DIR = os.path.join(DATA_DIR, 'dataloader')
 RNN_MODEL_DIR = os.path.join(DATA_DIR, 'rnn_checkpoints')
 RNN_RESULT_DIR = os.path.join(DATA_DIR, 'rnn_result')
 

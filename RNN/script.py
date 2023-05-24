@@ -7,7 +7,9 @@ DEFAULT_CONFIG = {"model_dir": RNN_MODEL_DIR,
                   "result_dir": RNN_RESULT_DIR,
                   "dropout_rate": 0.2,
                   "batch_size": 100,
-                  "start_symbol": START_SYMBOL}
+                  "start_symbol": START_SYMBOL,
+                  "load_model": False,
+                  "load_vocab": True}
 
 synthetic1_config = {"fname": "synthetic_data_1",
                      "hidden_size": 16,

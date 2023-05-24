@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm, trange
 
 from config import RANDOM_STATE, RNN_MODEL_DIR, RNN_RESULT_DIR, START_SYMBOL
-from data.utils import save2csv, save2npy
+from data.utils import save2csv, save2npy, save2pickle
 from RNN.data_loader import get_loader
 from RNN.model import VanillaRNN, VanillaLSTMModel, VanillaGRUModel, GloveModel
 
@@ -53,7 +53,7 @@ def train_and_validate(model, model_path, train_data, valid_data, learning_rate,
             total += output.size(0)
 
         # print epoch accuracy
-        print("\nEpoch {} training accuracy: {}/{} ".format(epoch, correct, total), correct / total)
+        print("\nEpoch {} training accuracy: {}/{} ".format(epoch + 1, correct, total), correct / total)
         valid_acc = validate(model, valid_data)
 
         # keep best acc model
@@ -89,7 +89,7 @@ def train(model, model_path, train_data, learning_rate, total_epoch):
             total += output.size(0)
 
         # print epoch accuracy
-        print("\nEpoch {} training accuracy: {}/{} ".format(epoch, correct, total), correct / total)
+        print("\nEpoch {} training accuracy: {}/{} ".format(epoch + 1, correct, total), correct / total)
 
     torch.save(model.state_dict(), model_path)
 
@@ -131,7 +131,7 @@ def predict(model, dataloader):
     return prediction
 
 
-def predict_and_save(save_path, fname, model, dataloader, vocab):
+def predict_and_save(save_path, fname, model, dataloader):
     with torch.no_grad():
         model.eval()
         prediction, res = [], {}
@@ -153,7 +153,7 @@ def predict_and_save(save_path, fname, model, dataloader, vocab):
             res['output'] = np.concatenate((res.get('output', np.ndarray(shape=(0, *output.shape[1:]))), output), axis=0)
             res['labels'] = np.concatenate((res.get('labels', np.ndarray(shape=(0, *label.shape[1:]))), label), axis=0)
 
-    save2npy(save_path, (res, vocab), f"{fname}_data")
+    save2npy(save_path, res, f"{fname}_data")
 
     return prediction
 
@@ -163,13 +163,18 @@ def main(config):
     if not os.path.exists(config.model_dir):
         os.makedirs(config.model_dir)
 
+    model_dir = os.path.join(config.model_dir, "{}_{}.pkl".format(config.fname, config.model))
     result_dir = os.path.join(config.result_dir, config.fname, config.model)
 
     # load data
     train_data, valid_data, test_data, vocab = get_loader(
         fname=config.fname,
         batch_size=config.batch_size,
-        start_symbol=config.start_symbol
+        start_symbol=config.start_symbol,
+        load_vocab=config.load_vocab,
+        save_vocab=config.load_vocab,
+        load_loader=config.load_loader,
+        save_loader=config.save_loader
     )
 
     # model
@@ -200,38 +205,37 @@ def main(config):
 
     print("\n{} model for {} loaded...".format(config.model, config.fname))
 
-    if valid_data:
-        train_and_validate(model=model,
-                           model_path=os.path.join(config.model_dir, "{}_{}.pkl".format(config.fname, config.model)),
-                           train_data=train_data,
-                           valid_data=valid_data,
-                           learning_rate=config.learning_rate,
-                           total_epoch=config.total_epoch)
-    else:
-        train(model=model,
-              model_path=os.path.join(config.model_dir, "{}_{}.pkl".format(config.fname, config.model)),
-              train_data=train_data,
-              learning_rate=config.learning_rate,
-              total_epoch=config.total_epoch)
+    if config.load_model:
+        model.load_state_dict(torch.load(model_dir))
 
-    # model.load_state_dict(torch.load(os.path.join(config.model_dir, "{}_{}.pkl".format(config.fname, config.model))))
+    if config.need_train:
+        if valid_data:
+            train_and_validate(model=model,
+                               model_path=model_dir,
+                               train_data=train_data,
+                               valid_data=valid_data,
+                               learning_rate=config.learning_rate,
+                               total_epoch=config.total_epoch)
+        else:
+            train(model=model,
+                  model_path=model_dir,
+                  train_data=train_data,
+                  learning_rate=config.learning_rate,
+                  total_epoch=config.total_epoch)
 
     train_output = predict_and_save(save_path=result_dir,
                                     fname="train",
                                     model=model,
-                                    dataloader=train_data,
-                                    vocab=vocab)
+                                    dataloader=train_data)
     if valid_data:
         valid_output = predict_and_save(save_path=result_dir,
                                         fname="valid",
                                         model=model,
-                                        dataloader=valid_data,
-                                        vocab=vocab)
+                                        dataloader=valid_data)
     test_output = predict_and_save(save_path=result_dir,
                                    fname="test",
                                    model=model,
-                                   dataloader=test_data,
-                                   vocab=vocab)
+                                   dataloader=test_data)
     sub_df = pd.DataFrame()
     try:
         sub_df['text'] = test_data.dataset.df['text']
@@ -252,6 +256,13 @@ if __name__ == "__main__":
     parser.add_argument("--model_dir", type=str, default=RNN_MODEL_DIR)
     parser.add_argument("--result_dir", type=str, default=RNN_RESULT_DIR)
     parser.add_argument("--start_symbol", type=str, default=START_SYMBOL)
+    parser.add_argument("--load_vocab", type=bool, default=True)
+    parser.add_argument("--save_vocab", type=bool, default=True)
+    parser.add_argument("--load_loader", type=bool, default=True)
+    parser.add_argument("--load_loader", type=bool, default=True)
+    # parser.add_argument("--load_data", type=bool, default=True)
+    parser.add_argument("--load_model", type=bool, default=False)
+    parser.add_argument("--need_train", type=bool, default=True)
     # parser.add_argument("--vocab_path", type=str, default='vocab.pkl')
 
     # model parameters
