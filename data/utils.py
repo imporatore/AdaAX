@@ -100,43 +100,48 @@ def gen_dataset(alphabet, rule, lens, num_per_len, class_balance=True):
     return [X[i] for i in rand_order], [y[i] for i in rand_order]
 
 
-def save2pickle(fpath, data, fname):
+def save2pickle(fpath, data, fname, **kwargs):
 
     if not os.path.exists(fpath):
         os.makedirs(fpath)
 
     with open(os.path.join(fpath, fname + ".pickle"), "wb") as handle:
-        pickle.dump(data, handle)
+        pickle.dump(data, handle, **kwargs)
         # pickle.dump(save_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
     handle.close()
     print("Successfully dumped %s in %s." % (fname, fpath))
 
 
-def load_pickle(fpath, fname):
+def load_pickle(fpath, fname, **kwargs):
     with open(os.path.join(fpath, fname + ".pickle"), 'rb') as handle:
-        data = pickle.load(handle)
+        data = pickle.load(handle, **kwargs)
     handle.close()
     return data
 
 
-def save2csv(fpath, data, fname):
+def save2csv(fpath, data, fname, **kwargs):
 
     if not os.path.exists(fpath):
         os.makedirs(fpath)
 
     if isinstance(data, tuple):
         data = pd.DataFrame(data, columns=['expr', 'label'])
-    data.to_csv(os.path.join(fpath, fname + ".csv"), index=False)
+    data.to_csv(os.path.join(fpath, fname + ".csv"), index=False, **kwargs)
 
 
-def load_csv(fpath, fname):
-    data = pd.read_csv(os.path.join(fpath, fname + ".csv"))
+def load_csv(fpath, fname, **kwargs):
+    data = pd.read_csv(os.path.join(fpath, fname + ".csv"), **kwargs)
     return data
 
 
-def save2npy(fpath, data, fname):
+def save2npy(fpath, data, fname, **kwargs):
 
     if not os.path.exists(fpath):
         os.makedirs(fpath)
 
-    np.save(os.path.join(fpath, fname + '.npy'), data)
+    np.save(os.path.join(fpath, fname + '.npy'), data, **kwargs)
+
+
+def load_npy(fpath, fname, **kwargs):
+    data = np.load(os.path.join(fpath, fname + '.npy'), **kwargs)
+    return data

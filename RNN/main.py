@@ -124,7 +124,7 @@ def predict(model, dataloader):
             # convert to cuda
             seq = seq.to(device)
 
-            output, hidden = model(seq)
+            output, _ = model(seq)
             output = torch.sigmoid(output).round().cpu().numpy()
             prediction.extend(output.tolist())
 
@@ -142,7 +142,7 @@ def predict_and_save(save_path, fname, model, dataloader):
 
             output, hidden = model(seq)
             seq = seq.cpu().numpy()
-            hidden = hidden.cpu().numpy().squeeze()
+            hidden = hidden.cpu().numpy()
             label = label.cpu().numpy()
             output = torch.sigmoid(output).cpu().numpy().squeeze()
             prediction.extend(output.round().tolist())

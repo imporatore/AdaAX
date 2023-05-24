@@ -89,7 +89,7 @@ def get_loader(fname, batch_size, start_symbol, load_vocab, save_vocab, load_loa
     if load_loader:
         try:
             return load_pickle(VOCAB_DIR, fname)
-        except OSError:
+        except FileNotFoundError:
             pass
 
     loaded_vocab = None

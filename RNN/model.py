@@ -21,7 +21,7 @@ class VanillaRNN(nn.Module):
         # assert torch.equal(rnn_out[-1, :, :], hidden.squeeze(0))
         # out = self.linear(rnn_out[:])
         out = self.linear(hidden_state.squeeze(0))
-        return out, hidden_state
+        return out, rnn_out
 
 
 class VanillaLSTMModel(nn.Module):
@@ -44,7 +44,7 @@ class VanillaLSTMModel(nn.Module):
         # cell state: tensor containing the cell state for last timestep. shape: (1, batch, hidden_size)
         lstm_out, (hidden_state, cell_state) = self.lstm(embeddings)
         out = self.linear(hidden_state.squeeze(0))
-        return out, hidden_state
+        return out, lstm_out
 
 
 class VanillaGRUModel(nn.Module):
@@ -63,7 +63,7 @@ class VanillaGRUModel(nn.Module):
         embeddings = self.dropout(embeddings)
         gru_out, hidden_state = self.gru(embeddings)
         out = self.linear(hidden_state.squeeze(0))
-        return out, hidden_state
+        return out, gru_out
 
 
 class GloveModel(nn.Module):
@@ -94,7 +94,7 @@ class GloveModel(nn.Module):
         # concat forward and pooled states
         concat = torch.cat((hidden_state[-1, :, :], max_pool, avg_pool), dim=1)
         out = self.linear(concat)
-        return out, hidden_state
+        return out, lstm_out
 
 
 if __name__ == '__main__':

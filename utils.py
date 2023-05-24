@@ -1,6 +1,29 @@
+import os
+
 import numpy as np
 
-from config import START_SYMBOL
+from config import START_SYMBOL, RNN_RESULT_DIR
+from data.utils import load_npy
+
+
+def read_results(fname, model):
+    result_dir = os.path.join(RNN_RESULT_DIR, fname, model)
+
+    train_result = load_npy(result_dir, 'train_data').item()
+    test_result = load_npy(result_dir, 'test_data').item()
+
+    try:
+        valid_result = load_npy(result_dir, 'valid_data').item()
+    except FileNotFoundError:
+        valid_result = None
+
+    result = {}
+    for res in [train_result, valid_result, test_result]:
+        for i in ['input', 'hidden', 'output']:
+            if res:
+                result[i] = np.concatenate((result.get(i, np.ndarray((0, *res[i].shape[1:]))), res[i]), axis=0)
+
+    return res['input'], res['hidden'], ['output']
 
 
 class RNNLoader:
