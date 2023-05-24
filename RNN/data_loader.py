@@ -59,7 +59,7 @@ class PolarityDataset(Dataset):
         self.df.loc[:, "text"] = self.df["text"].apply(preprocess).values  # preprocess
         self.df['words'] = self.df["text"].apply(tokenize)  # tokenize
         self.df.loc[:, 'words'] = self.df['words'].apply(lambda x: start_prefix + x).values
-        self.df = self.df.loc[self.df['words'].apply(len) > 1].reset_index(drop=True)  # filter out rows with lengths of 0
+        self.df = self.df.loc[self.df['words'].apply(len) > 1].reset_index(drop=True)  # filter out empty rows
 
         self.vocab = build_vocab(self.df['words'], min_count, vocab)  # build vocab
         seqs = pad_seq2idx(self.df['words'], pad_len, self.vocab.word2idx)  # pad to fix length & substitute with index

@@ -129,11 +129,5 @@ class RNNConfig:
     def __getattr__(self, item):
         return self.config[item]
 
-    def __setattr__(self, key, value):
-        self.config[key] = value
-
-    def __delattr__(self, item):
-        self.config.pop(item)
-
     def update(self, new_config):
         self.config.update(new_config)

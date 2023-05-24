@@ -11,19 +11,19 @@ DEFAULT_CONFIG = {"model_dir": RNN_MODEL_DIR,
 synthetic1_config = {"fname": "synthetic_data_1",
                      "hidden_size": 16,
                      "embedding_size": 16,
-                     "total_batch": 10,
+                     "total_epoch": 10,
                      "learning_rate": 0.01}
 
 synthetic2_config = {"fname": "synthetic_data_2",
                      "hidden_size": 16,
                      "embedding_size": 16,
-                     "total_batch": 10,
+                     "total_epoch": 10,
                      "learning_rate": 0.01}
 
 tomita1_config = {"fname": "tomita_data_1",
                   "hidden_size": 32,
                   "embedding_size": 32,
-                  "total_batch": 10,
+                  "total_epoch": 10,
                   "learning_rate": 0.005}
 
 tomita2_config = {}
@@ -31,7 +31,7 @@ tomita2_config = {}
 yelp_config = {"fname": "yelp_review_balanced",
                "hidden_size": 256,
                "embedding_size": 100,
-               "total_batch": 10,
+               "total_epoch": 10,
                "learning_rate": 0.001}
 
 
