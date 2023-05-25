@@ -88,7 +88,7 @@ def get_loader(fname, batch_size, start_symbol, load_vocab, save_vocab, load_loa
 
     if load_loader:
         try:
-            return load_pickle(VOCAB_DIR, fname)
+            return load_pickle(DATALOADER_DIR, fname)
         except FileNotFoundError:
             pass
 
@@ -148,9 +148,9 @@ def get_loader(fname, batch_size, start_symbol, load_vocab, save_vocab, load_loa
         dataloaders = (train_dataloader, valid_dataloader, test_dataloader, train_dataset.vocab)
 
     if (loaded_vocab is None) and save_vocab:
-        save2pickle(VOCAB_DIR, train_dataset.vocab)
+        save2pickle(VOCAB_DIR, train_dataset.vocab, fname)
 
     if save_loader:
-        save2pickle(DATALOADER_DIR, dataloaders)
+        save2pickle(DATALOADER_DIR, dataloaders, fname)
 
     return dataloaders

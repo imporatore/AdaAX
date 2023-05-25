@@ -259,7 +259,7 @@ if __name__ == "__main__":
     parser.add_argument("--load_vocab", type=bool, default=True)
     parser.add_argument("--save_vocab", type=bool, default=True)
     parser.add_argument("--load_loader", type=bool, default=True)
-    parser.add_argument("--load_loader", type=bool, default=True)
+    parser.add_argument("--save_loader", type=bool, default=True)
     # parser.add_argument("--load_data", type=bool, default=True)
     parser.add_argument("--load_model", type=bool, default=False)
     parser.add_argument("--need_train", type=bool, default=True)

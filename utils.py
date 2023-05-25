@@ -2,12 +2,54 @@ import os
 
 import numpy as np
 
-from config import START_SYMBOL, RNN_RESULT_DIR
+from config import START_SYMBOL, START_PREFIX, RNN_RESULT_DIR
 from data.utils import load_npy
 
 
-def read_results(fname, model):
-    result_dir = os.path.join(RNN_RESULT_DIR, fname, model)
+class SymbolNode:
+
+    def __init__(self, val):
+        self.val = val  # Symbol in the alphabet
+        self.next = []
+
+
+class PrefixTree:
+    def __init__(self, seq, hidden):
+        self.root = SymbolNode(START_SYMBOL)
+        self.root.h = hidden[0, 0, :]  # hidden values for start symbol
+        self._build_tree(seq, hidden)
+
+    def _build_tree(self, seq, hidden):
+        for s, h in zip(seq, hidden):
+            self._update(s[len(START_PREFIX):], h[len(START_PREFIX):])
+
+    # Seems there can't be two same pattern extracted.
+    # todo: modify the code.
+    def _update(self, s, h):
+        cur = self.root
+        for i, symbol in enumerate(s):
+            for n in cur.next:
+                if n.val == symbol:
+                    assert n.h == h[i, :]  # check if hidden value for same prefix consists
+                    cur = n
+                    break
+            else:
+                node = SymbolNode(symbol)
+                node.h = h[i, :]
+                cur.next.append(node)
+                cur = node
+
+    def eval_hidden(self, s):
+        cur = self.root
+        for symbol in enumerate(s):
+            for n in cur.next:
+                if n.val == symbol:
+                    cur = n
+        return cur.h
+
+
+def read_results(name, model):
+    result_dir = os.path.join(RNN_RESULT_DIR, name, model)
 
     train_result = load_npy(result_dir, 'train_data').item()
     test_result = load_npy(result_dir, 'test_data').item()
@@ -40,6 +82,7 @@ class RNNLoader:
         """
         self.alphabet = alphabet
         self.input_sequence, self.hidden_states, self.rnn_output = rnn_data
+        self.prefix_tree = PrefixTree(self.input_sequence, self.hidden_states)
 
         # Check shape
         assert self.input_sequence.shape[0] == self.hidden_states.shape[0]
@@ -53,7 +96,9 @@ class RNNLoader:
     # The hidden value in the RNN for given prefix
     # todo: Accelerate by using cashed hidden states
     def rnn_hidden_values(self, prefix):
-        pass
+        if START_SYMBOL:
+            return self.prefix_tree.eval_hidden(prefix[1:])
+        return self.prefix_tree.eval_hidden(prefix)
 
 
 def d(hidden1: np.array, hidden2: np.array):

@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 
 from config import K, THETA, START_SYMBOL, START_PREFIX
+from utils import SymbolNode
 
 
 # todo: check if extracted pattern is unique
@@ -91,13 +92,6 @@ def pattern_extraction(rnn_loader):
     pos_ind = np.arange(rnn_loader.input_sequences.shape[0])[rnn_loader.rnn_output == 1]
     _pattern_extraction(pos_ind, rnn_loader.input_sequences.shape[1] - 1, [])
     return patterns, support
-
-
-class SymbolNode:
-
-    def __init__(self, val):
-        self.val = val  # Symbol in the alphabet
-        self.next = []
 
 
 # todo: require testing

@@ -118,6 +118,11 @@ class Vocab(object):
             self.words.append(word)
             self.vocab_size += 1
 
+    def decode(self, seq):
+        text = [self.words[i] for i in seq]
+        text = [word for word in text if word != '<pad>']
+        return ' '.join(text)
+
     def get_pretrained_embedding(self, name, embedding_dim):
         """ Fetch pretrained embeddings when building vocab.
 
