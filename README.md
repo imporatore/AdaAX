@@ -48,3 +48,6 @@ The pre-pruned DFA is based on patterns(symbols). Quite different from pre-clust
 * hidden states are backtracked only for the positive samples, what for the states which leads to negative samples?
   * if attended in the clustering period, are they remained as a cluster? the transition to them?
 * How to deal with missing transitions? Do they exist?
+
+
+* cashed_property

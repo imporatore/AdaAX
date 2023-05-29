@@ -85,6 +85,11 @@ class PolarityDataset(Dataset):
 
 
 def get_loader(fname, batch_size, start_symbol, load_vocab, save_vocab, load_loader, save_loader):
+    if load_vocab:
+        try:
+            loaded_vocab = load_pickle(VOCAB_DIR, fname)
+        except FileNotFoundError:
+            pass
 
     if load_loader:
         try:
@@ -93,12 +98,6 @@ def get_loader(fname, batch_size, start_symbol, load_vocab, save_vocab, load_loa
             pass
 
     loaded_vocab = None
-
-    if load_vocab:
-        try:
-            loaded_vocab = load_pickle(VOCAB_DIR, fname)
-        except FileNotFoundError:
-            pass
 
     start_prefix = [start_symbol] if start_symbol else []
 

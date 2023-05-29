@@ -5,7 +5,7 @@ from main import main
 
 DEFAULT_CONFIG = {"model_dir": RNN_MODEL_DIR,
                   "result_dir": RNN_RESULT_DIR,
-                  "dropout_rate": 0.2,
+                  "dropout_rate": 0.5,
                   "batch_size": 100,
                   "start_symbol": START_SYMBOL,
                   "load_vocab": False,
@@ -37,7 +37,7 @@ tomita2_config = {}
 
 yelp_config = {"fname": "yelp_review_balanced",
                "hidden_size": 256,
-               "embedding_size": 100,
+               "embedding_size": 300,
                "total_epoch": 30,
                "learning_rate": 0.001}
 
@@ -74,8 +74,13 @@ def run(name, type, config=None):
 
 
 if __name__ == "__main__":
-    names = ['synthetic1', 'synthetic2', 'tomita1', 'tomita2', 'yelp']
-    models = ['rnn', 'lstm', 'gru']
-    for nam in names:
-        for mod in models:
-            run(nam, mod)
+    # names = ['synthetic1', 'synthetic2', 'tomita1', 'tomita2', 'yelp']
+    # models = ['rnn', 'lstm', 'gru']
+    # for nam in names:
+    #     for mod in models:
+    #         run(nam, mod)
+    run('tomita1', 'lstm', {"load_vocab": True, "load_loader": True})
+    run('tomita1', 'gru', {"load_vocab": True, "load_loader": True})
+    run('yelp', 'lstm', {"load_vocab": True, "load_loader": True})
+    run('yelp', 'gru', {"load_vocab": True, "load_loader": True})
+

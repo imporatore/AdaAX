@@ -7,15 +7,13 @@ from config import K, THETA, START_SYMBOL, START_PREFIX
 from utils import SymbolNode
 
 
-# todo: check if extracted pattern is unique
-
-
-# todo: require testing
-def pattern_extraction(rnn_loader):
+# todo: check if extracted pattern is unique: True
+def pattern_extraction(rnn_loader, remove_padding=True):
     """ Extract patterns by DFS backtracking at the level of core(focal) sets.
 
         Args:
             rnn_loader
+            remove_padding
 
         Params:
             K: Initial cluster numbers, determined by elbow method
@@ -35,7 +33,7 @@ def pattern_extraction(rnn_loader):
             rnn_loader.hidden_states[:, len(START_PREFIX): -1, :].reshape((N * (L - 1 - len(START_PREFIX)), -1)))
         # add a cluster -1 for start state
         start_cluster = np.array([-1] * N, dtype=np.int32).reshape((N, 1))
-        return np.hstack(start_cluster, kmeans.labels_.reshape((N, (L - 1 - len(START_PREFIX)))))
+        return np.hstack((start_cluster, kmeans.labels_.reshape((N, (L - 1 - len(START_PREFIX))))))
 
     clusters = _clustering()  # Notice shape, (N, L-1)
     patterns, support = [], []
@@ -56,7 +54,10 @@ def pattern_extraction(rnn_loader):
         # Reaches start state and add pattern
         # When start symbol was added,
         if lvl == 0:
-            patterns.append(START_PREFIX + p)
+            if START_SYMBOL:
+                patterns.append([rnn_loader.input_sequences[0, 0]] + p)
+            else:
+                patterns.append(p)
             support.append(len(ind) / rnn_loader.input_sequences.shape[0])
             return
 
@@ -80,7 +81,7 @@ def pattern_extraction(rnn_loader):
                 # Symbols backtracked from hidden_states
                 # ! Moved it inside the loop since the symbols used by sub clusters
                 # may not correspond to the whole prev states
-                Hs[rnn_loader.input_sequences[i, lvl]] = Hs.get(rnn_loader.input_sequences[i, lvl]) + [i]
+                Hs[rnn_loader.input_sequences[i, lvl]] = Hs.get(rnn_loader.input_sequences[i, lvl], []) + [i]
 
             # Search each symbol in descent order
             # ? Prune trivial symbols?
@@ -91,6 +92,20 @@ def pattern_extraction(rnn_loader):
     # Start fom the first focal set (last hidden layer of positive input sequences)
     pos_ind = np.arange(rnn_loader.input_sequences.shape[0])[rnn_loader.rnn_output == 1]
     _pattern_extraction(pos_ind, rnn_loader.input_sequences.shape[1] - 1, [])
+
+    if remove_padding:
+        try:
+            pad_idx = rnn_loader.alphabet.index('<pad>')
+            for i in range(len(patterns)):
+                try:
+                    patterns[i] = patterns[i][:patterns[i].index(pad_idx)]
+                except ValueError:
+                    pass
+        except ValueError:
+            print("Pad symbol not found.")
+
+    patterns = [rnn_loader.decode(pattern, as_list=True) for pattern in patterns]
+
     return patterns, support
 
 
@@ -122,8 +137,8 @@ class PatternTree:
                 cur.next.append(node)
                 cur = node
         try:
-            warnings.warn('Find existing leaf node (pattern), support summed.')
             cur.sup += s  # add support to existing leaf node
+            warnings.warn('Find existing leaf node (pattern), support summed.')
         except AttributeError:
             cur.sup = s  # assign support to new leaf node
 
@@ -136,4 +151,9 @@ class PatternTree:
 if __name__ == "__main__":
     # todo: func test: pattern_extraction
     # todo: class test: PatternTree
+    from utils import RNNLoader
+
+    loader = RNNLoader('yelp_review_balanced', 'lstm')
+    patterns, supports = pattern_extraction(loader)
+    PatternTree(patterns, supports)
     pass

@@ -16,8 +16,16 @@ __pycache__/*.pyc
 
 /data/__pycache__/
 /data/rnn_result/
+/data/vocab/*.pickle
+/data/dataloader/*.pickle
 /data/raw_data/*.csv
 /data/synthetic_data/*.pickle
 /data/tomita_data/*.pickle
 /data/real_data/*.csv
 /data/rnn_checkpoints/*.pkl
+
+*.npy
+*.pkl
+*.pickle
+*.csv
+/data/rnn_result/tomita_data_2/

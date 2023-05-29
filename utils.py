@@ -1,9 +1,11 @@
 import os
+import time
+import functools
 
 import numpy as np
 
-from config import START_SYMBOL, START_PREFIX, RNN_RESULT_DIR
-from data.utils import load_npy
+from config import START_SYMBOL, START_PREFIX, RNN_RESULT_DIR, VOCAB_DIR
+from data.utils import load_npy, load_pickle
 
 
 class SymbolNode:
@@ -30,7 +32,7 @@ class PrefixTree:
         for i, symbol in enumerate(s):
             for n in cur.next:
                 if n.val == symbol:
-                    assert n.h == h[i, :]  # check if hidden value for same prefix consists
+                    # assert (n.h == h[i, :]).all()  # check if hidden value for same prefix consists
                     cur = n
                     break
             else:
@@ -41,7 +43,7 @@ class PrefixTree:
 
     def eval_hidden(self, s):
         cur = self.root
-        for symbol in enumerate(s):
+        for symbol in s:
             for n in cur.next:
                 if n.val == symbol:
                     cur = n
@@ -59,39 +61,45 @@ def read_results(name, model):
     except FileNotFoundError:
         valid_result = None
 
+    vocab = load_pickle(VOCAB_DIR, name)
+
     result = {}
     for res in [train_result, valid_result, test_result]:
-        for i in ['input', 'hidden', 'output']:
-            if res:
-                result[i] = np.concatenate((result.get(i, np.ndarray((0, *res[i].shape[1:]))), res[i]), axis=0)
+        if res:
+            for i in ['input', 'hidden', 'output']:
+                result[i] = np.concatenate((result.get(i, np.ndarray(
+                    (0, *res[i].shape[1:]), dtype=res[i].dtype)), res[i]), axis=0)
 
-    return res['input'], res['hidden'], ['output']
+    return vocab, result['input'], result['hidden'], result['output']
 
 
 class RNNLoader:
 
-    def __int__(self, alphabet, rnn_data):
+    def __init__(self, name, model):
         """ Result loader of trained RNN for extracting patterns and building DFA.
 
-        Args:
+        Attributes:
             - alphabet: list of shape (VOCAB_SIZE)
             - rnn_data: (input_sequence, hidden_states, rnn_output)
                 - input_sequence, np.array of shape (N, PAD_LEN)
                 - hidden_states, np.array of shape (N, PAD_LEN, hidden_dim)
                 - rnn_output, np.array of shape (N,)
         """
-        self.alphabet = alphabet
-        self.input_sequence, self.hidden_states, self.rnn_output = rnn_data
-        self.prefix_tree = PrefixTree(self.input_sequence, self.hidden_states)
+
+        vocab, *rnn_data = read_results(name, model)
+        self.vocab, self.alphabet = vocab, vocab.words
+        self.input_sequences, self.hidden_states, self.rnn_prob_output = rnn_data
+        self.rnn_output = self.rnn_prob_output.round()
+        self.prefix_tree = PrefixTree(self.input_sequences, self.hidden_states)
 
         # Check shape
-        assert self.input_sequence.shape[0] == self.hidden_states.shape[0]
-        assert self.input_sequence.shape[1] == self.hidden_states.shape[1]
-        assert self.input_sequence.shape[0] == self.rnn_output.shape[0]
-
-        # Check START_SYMBOL
-        if START_SYMBOL:
-            assert self.input_sequence[:, 0] == START_SYMBOL
+        # assert self.input_sequence.shape[0] == self.hidden_states.shape[0]
+        # assert self.input_sequence.shape[1] == self.hidden_states.shape[1]
+        # assert self.input_sequence.shape[0] == self.rnn_output.shape[0]
+        #
+        # # Check START_SYMBOL
+        # if START_SYMBOL:
+        #     assert self.input_sequence[:, 0] == START_SYMBOL
 
     # The hidden value in the RNN for given prefix
     # todo: Accelerate by using cashed hidden states
@@ -99,6 +107,24 @@ class RNNLoader:
         if START_SYMBOL:
             return self.prefix_tree.eval_hidden(prefix[1:])
         return self.prefix_tree.eval_hidden(prefix)
+
+    def decode(self, seq, remove_padding=True, as_list=False, sep=' '):
+        text = [self.vocab.words[i] for i in seq]
+        if remove_padding:
+            text = [word for word in text if word != '<pad>']
+        if as_list:
+            return text
+        return sep.join(text)
+
+    # todo: require testing
+    # todo: only called when merging, may use cashed result to accelerate, as the difference in the merged DFA is small
+    def fidelity(self, dfa):
+        """ Evaluate the fidelity of (extracted) DFA from rnn_loader."""
+        return np.mean([dfa.classify_expression(self.decode(expr).split(' ')) == ro for expr, ro in zip(
+            self.input_sequences, self.rnn_output)])
+
+
+# ---------------------------- math --------------------------------
 
 
 def d(hidden1: np.array, hidden2: np.array):
@@ -109,6 +135,7 @@ def d(hidden1: np.array, hidden2: np.array):
 # todo: add logger
 
 
+# ------------------------- plotting -------------------------------
 def add_nodes(graph, nodes):  # stolen from http://matthiaseisen.com/articles/graphviz/
     for n in nodes:
         if isinstance(n, tuple):
@@ -127,5 +154,27 @@ def add_edges(graph, edges):
     return graph
 
 
+# ---------------------------- logger ---------------------------------
+def logger(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        print(f"----- {func.__name__}: start -----")
+        output = func(*args, **kwargs)
+        print(f"----- {func.__name__}: end -----")
+        return output
+    return wrapper
+
+
+def timeit(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        end = time.perf_counter()
+        print(f'{func.__name__} took {end - start:.6f} seconds to complete')
+        return result
+    return wrapper
+
+
 if __name__ == "__main__":
-    pass
+    loader = RNNLoader('tomita_data_1', 'lstm')

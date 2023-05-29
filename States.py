@@ -7,39 +7,34 @@ from collections import defaultdict
 
 import numpy as np
 
-from config import START_SYMBOL
+from config import START_PREFIX
 
 
 class PureSet:
     """ Pure Sets are determined by only one prefix(path), so have consistent hidden value."""
 
-    def __init__(self, rnn_loader, prefix):
+    def __init__(self, prefix):
         """
 
         Args:
-            rnn_loader
             prefix: list, a list of symbols which form the path from the start h0 to this 'pure set'.
         """
         self._prefix = prefix
-        self._h = rnn_loader.rnn_hidden_values(prefix)  # hidden value
-
-    def __str__(self):
-        pass
 
     def __repr__(self):
         pass
 
 
-class State(PureSet):
+class State:
     """ State(in DFA) is a set of 'PureSet'(prefixes).
 
     Holds the prefixes of all PureSets this state contains."""
 
-    def __init__(self, rnn_loader, prefix, prev_state=None):
+    def __init__(self, prefixes):
         """
 
         Args:
-            rnn_loader
+            hidden_eval_func
             prefix: list, a list of symbols which initialize the State (as a PureSet).
                 - The first prefix upon which the PureSet is built.
                 - Also, the hidden value of this PureSet is evaluated on this prefix.
@@ -47,45 +42,28 @@ class State(PureSet):
                 - also the state which represent prefix prefix[:-1].
         """
         # todo: hidden state value is set to be a constant and never updates, even after merging.
-        super().__init__(rnn_loader, prefix)
-
-        self.parents = defaultdict(list)  # parent set dict: {symbol: [prev_states]} prev_state ---symbol--> state
-        if prev_state:
-            self.parents[prefix[-1]] = [prev_state]
-
-        self._rnn_hidden_value = rnn_loader.rnn_hidden_values  # hidden value function
+        if not prefixes:
+            self.prefixes = []
+        elif not isinstance(prefixes, list):
+            raise ValueError("Argument prefixes must be a list.")
         # todo: add support for each prefix
+        if not isinstance(prefixes[0], list):
+            self.prefixes = [prefixes]
+        else:
+            self.prefixes = prefixes
 
-    # todo: prefixes can be updated explicitly in the consolidation stage
-    # However, as long as it was seldom called, it can remain here.
-    @property
-    def prefixes(self):
-        """ All prefixes which goes to the state.
-
-        Returns:
-            prefixes: list[list], list of prefixes, where each prefix is a list of symbols
-        """
-        if self._prefix == [START_SYMBOL]:  # start state
-            return [[START_SYMBOL]]
-        res = []
-        for s, states in self.parents.items():
-            for state in states:
-                res.extend([prefix + s for prefix in state.prefixes])
-        return res
-
-    @property
-    def h(self):
+    def h(self, rnn_loader):
         """ Evaluate the new hidden value (after merged). Unused for now."""
         # todo: weighted (by support) average of all prefixes
-        hidden_vals = [self._rnn_hidden_value(p) for p in self.prefixes]
+        hidden_vals = [rnn_loader.rnn_hidden_values(p) for p in self.prefixes]
         return np.mean(np.array(hidden_vals), axis=0)
 
 
-def build_start_state(rnn_loader):
+def build_start_state():
     """ Build start state for the DFA.
 
     Args:
-        rnn_loader
+        hidden_eval_func
 
     Params:
         START_SYMBOL: symbol for represent sentence start,
@@ -96,25 +74,28 @@ def build_start_state(rnn_loader):
     Returns:
         h0, a 'PureSet'(State) of start state.
     """
-    if START_SYMBOL:
-        return State(rnn_loader, [START_SYMBOL])
-    else:
-        return State(rnn_loader, [])
+    return State(START_PREFIX)
 
 
-def build_accept_state(rnn_loader):
+def build_accept_state():
     """ Build accept state for the DFA.
-
-    Args:
-        rnn_loader
 
     Returns:
         h0, a 'PureSet'(State) of start state.
     """
-    F = State(rnn_loader, None)
+    F = State(None)
 
     # Accept states owns all positive prefixes (added in add_pattern func)
     # todo: it is likely that they aren't used, so can be duplicated
-    # F._prefix = rnn_loader.input_sequence[rnn_loader.rnn_output == 1]
-    F._h = np.mean(rnn_loader.hidden_states[rnn_loader.rnn_output == 1, -1, :], axis=0)
+
+    # F._h = np.mean(rnn_loader.hidden_states[rnn_loader.rnn_output == 1, -1, :], axis=0)
     return F
+
+
+if __name__ == "__main__":
+    from utils import RNNLoader
+
+    loader = RNNLoader('tomita_data_1', 'lstm')
+    State._h = State().h(loader)
+    start_state = build_start_state()
+    print(start_state.h(loader))

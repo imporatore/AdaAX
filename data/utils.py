@@ -142,6 +142,6 @@ def save2npy(fpath, data, fname, **kwargs):
     np.save(os.path.join(fpath, fname + '.npy'), data, **kwargs)
 
 
-def load_npy(fpath, fname, **kwargs):
-    data = np.load(os.path.join(fpath, fname + '.npy'), **kwargs)
+def load_npy(fpath, fname, allow_pickle=True, **kwargs):
+    data = np.load(os.path.join(fpath, fname + '.npy'), allow_pickle=allow_pickle, **kwargs)
     return data

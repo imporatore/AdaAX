@@ -148,10 +148,14 @@ def predict_and_save(save_path, fname, model, dataloader):
             prediction.extend(output.round().tolist())
 
             # Package data
-            res['input'] = np.concatenate((res.get('input', np.ndarray(shape=(0, *seq.shape[1:]))), seq), axis=0)
-            res['hidden'] = np.concatenate((res.get('hidden', np.ndarray(shape=(0, *hidden.shape[1:]))), hidden), axis=0)
-            res['output'] = np.concatenate((res.get('output', np.ndarray(shape=(0, *output.shape[1:]))), output), axis=0)
-            res['labels'] = np.concatenate((res.get('labels', np.ndarray(shape=(0, *label.shape[1:]))), label), axis=0)
+            res['input'] = np.concatenate((res.get('input', np.ndarray(
+                shape=(0, *seq.shape[1:]), dtype='int')), seq), axis=0)
+            res['hidden'] = np.concatenate((res.get('hidden', np.ndarray(
+                shape=(0, *hidden.shape[1:]))), hidden), axis=0)
+            res['output'] = np.concatenate((res.get('output', np.ndarray(
+                shape=(0, *output.shape[1:]))), output), axis=0)
+            res['labels'] = np.concatenate((res.get('labels', np.ndarray(
+                shape=(0, *label.shape[1:]), dtype='int')), label), axis=0)
 
     save2npy(save_path, res, f"{fname}_data")
 
@@ -203,10 +207,12 @@ def main(config):
                            config.dropout_rate,
                            glove).to(device)
 
-    print("\n{} model for {} loaded...".format(config.model, config.fname))
-
     if config.load_model:
-        model.load_state_dict(torch.load(model_dir))
+        try:
+            model.load_state_dict(torch.load(model_dir))
+            print("\n{} model for {} loaded...".format(config.model, config.fname))
+        except FileNotFoundError:
+            print("")
 
     if config.need_train:
         if valid_data:
@@ -251,7 +257,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # setup parameters
-    parser.add_argument("--fname", type=str, default="yelp_review_balanced")
+    parser.add_argument("--fname", type=str, default="tomita_data_1")
     parser.add_argument("--model", type=str, default="rnn", choices=["rnn", "lstm", "gru", "glove-lstm"])
     parser.add_argument("--model_dir", type=str, default=RNN_MODEL_DIR)
     parser.add_argument("--result_dir", type=str, default=RNN_RESULT_DIR)
