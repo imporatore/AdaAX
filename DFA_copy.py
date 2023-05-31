@@ -8,7 +8,7 @@ from IPython.display import Image
 from IPython.display import display
 
 from States_copy import State, build_start_state, build_accept_state
-from utils import d, add_nodes, add_edges
+from utils import d, add_nodes, add_edges, LazyAttribute
 from config import TAU, DELTA, START_PREFIX, SEP
 
 digraph = functools.partial(gv.Digraph, format='png')
@@ -28,7 +28,6 @@ class DFA:
         self.Q = [self.q0, self.F]  # states
         self.delta = defaultdict(dict)  # transition table
 
-        # todo: check if this would take a lot of memory
         self._rnn_loader = rnn_loader
 
     # todo: add pattern by PatternTree
@@ -203,7 +202,6 @@ class DFA:
         self._add_transit(prev_state, prefix[-1], state)  # Update transition
         return state
 
-    # todo: require testing
     # todo: as we only extract patterns from positive samples, and DFA entirely built on these patterns
     # todo: how to deal with missing transitions?
     # todo: needs modification
@@ -218,8 +216,8 @@ class DFA:
         # return q == self.F
         return True
 
-    # todo: require testing
     # todo: only called when merging, may use cashed result to accelerate, as the difference in the merged DFA is small
+    @LazyAttribute
     @property
     def fidelity(self):
         """ Evaluate the fidelity of (extracted) DFA from rnn_loader."""
@@ -232,8 +230,9 @@ class DFA:
         if state1 not in state2.parents[symbol]:
             state2.parents[symbol].append(state1)  # update parent set of state2
 
+    @LazyAttribute
     @property
-    def edges(self):
+    def _edges(self):
         edges_dict = defaultdict(list)
 
         for parent in self.delta.keys():
@@ -262,7 +261,7 @@ class DFA:
                           for state in self.Q if state not in (self.q0, self.F)])
         g = add_nodes(g, [(_state2int(self.F), {'color': 'green', 'shape': 'hexagon', 'label': 'Accept'})])
 
-        g = add_edges(g, [(e, {'label': SEP.join(self.edges[e])}) for e in self.edges.keys()])
+        g = add_edges(g, [(e, {'label': SEP.join(self._edges[e])}) for e in self._edges.keys()])
 
         display(Image(filename=g.render(filename='img/automaton')))
 

@@ -3,12 +3,10 @@ import warnings
 import numpy as np
 from sklearn.cluster import KMeans
 
-from config import K, THETA, START_SYMBOL, START_PREFIX
-from utils import SymbolNode
+from config import K, THETA, START_PREFIX, SEP
 
 
-# todo: check if extracted pattern is unique: True
-def pattern_extraction(rnn_loader, remove_padding=True):
+def pattern_extraction(rnn_loader, remove_padding=True, label=True):
     """ Extract patterns by DFS backtracking at the level of core(focal) sets.
 
         Args:
@@ -54,11 +52,11 @@ def pattern_extraction(rnn_loader, remove_padding=True):
         # Reaches start state and add pattern
         # When start symbol was added,
         if lvl == 0:
-            if START_SYMBOL:
-                patterns.append([rnn_loader.input_sequences[0, 0]] + p)
+            if START_PREFIX:
+                patterns.append(START_PREFIX + p)
             else:
                 patterns.append(p)
-            support.append(len(ind) / rnn_loader.input_sequences.shape[0])
+            support.append(len(ind) / rnn_loader.decoded_input_seq.shape[0])
             return
 
         # Split previous states by cluster_ids
@@ -72,7 +70,7 @@ def pattern_extraction(rnn_loader, remove_padding=True):
             # Prune if the size of sub cluster is too small
             # ? Actually we are not calculating the data support of core set, instead we sum by symbols
             # ! Use break instead of continue since we have already sorted cluster_ids by its size in descent order
-            if len(inds[k]) / rnn_loader.input_sequences.shape[0] < THETA:
+            if len(inds[k]) / rnn_loader.decoded_input_seq.shape[0] < THETA:
                 break
 
             # ! Likewise, move it outside the for loop for accelerating
@@ -81,7 +79,7 @@ def pattern_extraction(rnn_loader, remove_padding=True):
                 # Symbols backtracked from hidden_states
                 # ! Moved it inside the loop since the symbols used by sub clusters
                 # may not correspond to the whole prev states
-                Hs[rnn_loader.input_sequences[i, lvl]] = Hs.get(rnn_loader.input_sequences[i, lvl], []) + [i]
+                Hs[rnn_loader.decoded_input_seq[i, lvl]] = Hs.get(rnn_loader.decoded_input_seq[i, lvl], []) + [i]
 
             # Search each symbol in descent order
             # ? Prune trivial symbols?
@@ -90,70 +88,93 @@ def pattern_extraction(rnn_loader, remove_padding=True):
                 _pattern_extraction(Hs[x], lvl - 1, [x] + p)
 
     # Start fom the first focal set (last hidden layer of positive input sequences)
-    pos_ind = np.arange(rnn_loader.input_sequences.shape[0])[rnn_loader.rnn_output == 1]
-    _pattern_extraction(pos_ind, rnn_loader.input_sequences.shape[1] - 1, [])
+    if label:
+        pos_ind = np.arange(rnn_loader.decoded_input_seq.shape[0])[rnn_loader.rnn_output == 1]
+        _pattern_extraction(pos_ind, rnn_loader.decoded_input_seq.shape[1] - 1, [])
+    else:
+        neg_ind = np.arange(rnn_loader.decoded_input_seq.shape[0])[rnn_loader.rnn_output == 0]
+        _pattern_extraction(neg_ind, rnn_loader.decoded_input_seq.shape[1] - 1, [])
 
     if remove_padding:
-        try:
-            pad_idx = rnn_loader.alphabet.index('<pad>')
-            for i in range(len(patterns)):
-                try:
-                    patterns[i] = patterns[i][:patterns[i].index(pad_idx)]
-                except ValueError:
-                    pass
-        except ValueError:
-            print("Pad symbol not found.")
+        for i in range(len(patterns)):
+            try:
+                patterns[i] = patterns[i][:patterns[i].index('<pad>')]
+            except ValueError:
+                pass
 
-    patterns = [rnn_loader.decode(pattern, as_list=True) for pattern in patterns]
+    # patterns = [rnn_loader.decode(pattern, as_list=True) for pattern in patterns]
 
     return patterns, support
 
 
-# todo: require testing
 # Yet, the PatternTree is analogous to building a DFA without the consolidation phase for now.
 # Unused for now, can be used to visualize patterns and corresponding support.
 class PatternTree:
-    """ Prefix tree for extracted pattern."""
+    """ Prefix tree for extracted pattern, with support updated."""
 
-    def __init__(self, patterns, support):
-        self.root = SymbolNode(START_SYMBOL)
-        self._build_tree(patterns, support)
+    def __init__(self, prefix_tree):
+        self.tree = prefix_tree
+        self.root = prefix_tree.root
 
-    def _build_tree(self, patterns, support):
+    def update_patterns(self, patterns, support, label=True):
         for p, s in zip(patterns, support):
-            self._update(p[len(START_PREFIX):], s)  # if START_SYMBOL, the first symbol of pattern would be START_SYMBOL
+            # if START_SYMBOL, the first symbol of pattern would be START_SYMBOL
+            self._update(p[len(START_PREFIX):], s, label=label)
 
     # Seems there can't be two same pattern extracted.
     # todo: modify the code.
-    def _update(self, p, s):
+    def _update(self, p, s, label):
         cur = self.root
         for symbol in p:
             for n in cur.next:
                 if n.val == symbol:
                     cur = n
+                    if label:
+                        try:
+                            cur.pos_sup += s
+                        except AttributeError:
+                            cur.pos_sup = s
+                    else:
+                        try:
+                            cur.neg_sup += s
+                        except AttributeError:
+                            cur.neg_sup = s
                     break
             else:
-                node = SymbolNode(symbol)
-                cur.next.append(node)
-                cur = node
-        try:
-            cur.sup += s  # add support to existing leaf node
-            warnings.warn('Find existing leaf node (pattern), support summed.')
-        except AttributeError:
-            cur.sup = s  # assign support to new leaf node
+                warnings.warn("Node for pattern %s not found." % p)
 
-    # todo: PatternTree flow
+    def eval_hidden(self, s):
+        return self.tree.eval_hidden(s)
+
     # so that we don't have to start from the start state when adding new pattern
     def __iter__(self):
-        yield
+        """ Parse the tree using DFS.
+
+        Return:
+
+        """
+        stack = [(self.root, self.root.val)]
+        while stack:
+            node, expr = stack.pop()
+            if not node.next:
+                yield expr, node.pos_sup, node.neg_sup
+            else:
+                for n in node.next:
+                    if n.val == '<pad>':
+                        yield expr, node.pos_sup, node.neg_sup
+                    else:
+                        stack.append((n, expr + SEP + n.val))
 
 
 if __name__ == "__main__":
-    # todo: func test: pattern_extraction
-    # todo: class test: PatternTree
     from utils import RNNLoader
 
-    loader = RNNLoader('yelp_review_balanced', 'lstm')
-    patterns, supports = pattern_extraction(loader)
-    PatternTree(patterns, supports)
+    loader = RNNLoader('tomita_data_1', 'gru')
+    pos_patterns, pos_supports = pattern_extraction(loader, label=True)
+    neg_patterns, neg_supports = pattern_extraction(loader, label=False)
+    pattern_tree = PatternTree(loader.prefix_tree)
+    pattern_tree.update_patterns(pos_patterns, pos_supports, label=True)
+    pattern_tree.update_patterns(neg_patterns, neg_supports, label=False)
+    for res in pattern_tree:
+        print(res)
     pass

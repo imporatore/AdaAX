@@ -8,11 +8,30 @@ from config import START_SYMBOL, START_PREFIX, RNN_RESULT_DIR, VOCAB_DIR
 from data.utils import load_npy, load_pickle
 
 
-class SymbolNode:
+# ----------------------------------- Data Structure ----------------------------------------
+
+class SymbolNode(object):
 
     def __init__(self, val):
         self.val = val  # Symbol in the alphabet
         self.next = []
+
+    def __getattr__(self, item):
+        if item in ['pos_sup', 'neg_sup']:
+            try:
+                return super().__getattr__(item)
+                # return self.__dict__[item]
+            except AttributeError:
+                # except KeyError:
+                return 0
+        return super().__getattr__(item)
+        # return self.__dict__[item]
+
+    @property
+    def sup(self):
+        if self.pos_sup or self.neg_sup:
+            return self.pos_sup - self.neg_sup
+        raise AttributeError("Node has neither positive support nor negative support.")
 
 
 class PrefixTree:
@@ -25,14 +44,11 @@ class PrefixTree:
         for s, h in zip(seq, hidden):
             self._update(s[len(START_PREFIX):], h[len(START_PREFIX):])
 
-    # Seems there can't be two same pattern extracted.
-    # todo: modify the code.
     def _update(self, s, h):
         cur = self.root
         for i, symbol in enumerate(s):
             for n in cur.next:
                 if n.val == symbol:
-                    # assert (n.h == h[i, :]).all()  # check if hidden value for same prefix consists
                     cur = n
                     break
             else:
@@ -41,14 +57,16 @@ class PrefixTree:
                 cur.next.append(node)
                 cur = node
 
-    def eval_hidden(self, s):
+    def eval_hidden(self, expr):
         cur = self.root
-        for symbol in s:
+        for symbol in expr:
             for n in cur.next:
                 if n.val == symbol:
                     cur = n
         return cur.h
 
+
+# --------------------------------------- Pipeline ---------------------------------------
 
 def read_results(name, model):
     result_dir = os.path.join(RNN_RESULT_DIR, name, model)
@@ -90,16 +108,9 @@ class RNNLoader:
         self.vocab, self.alphabet = vocab, vocab.words
         self.input_sequences, self.hidden_states, self.rnn_prob_output = rnn_data
         self.rnn_output = self.rnn_prob_output.round()
-        self.prefix_tree = PrefixTree(self.input_sequences, self.hidden_states)
-
-        # Check shape
-        # assert self.input_sequence.shape[0] == self.hidden_states.shape[0]
-        # assert self.input_sequence.shape[1] == self.hidden_states.shape[1]
-        # assert self.input_sequence.shape[0] == self.rnn_output.shape[0]
-        #
-        # # Check START_SYMBOL
-        # if START_SYMBOL:
-        #     assert self.input_sequence[:, 0] == START_SYMBOL
+        self.decoded_input_seq = np.array([self.decode(
+            seq, remove_padding=False, as_list=True) for seq in self.input_sequences])
+        self.prefix_tree = PrefixTree(self.decoded_input_seq, self.hidden_states)
 
     # The hidden value in the RNN for given prefix
     # todo: Accelerate by using cashed hidden states
@@ -116,26 +127,22 @@ class RNNLoader:
             return text
         return sep.join(text)
 
-    # todo: require testing
     # todo: only called when merging, may use cashed result to accelerate, as the difference in the merged DFA is small
     def fidelity(self, dfa):
         """ Evaluate the fidelity of (extracted) DFA from rnn_loader."""
-        return np.mean([dfa.classify_expression(self.decode(expr).split(' ')) == ro for expr, ro in zip(
+        return np.mean([dfa.classify_expression(self.decode(expr, as_list=True)) == ro for expr, ro in zip(
             self.input_sequences, self.rnn_output)])
 
 
 # ---------------------------- math --------------------------------
-
 
 def d(hidden1: np.array, hidden2: np.array):
     """ Euclidean distance of hidden state values."""
     return np.sqrt(np.sum((hidden1 - hidden2) ** 2))
 
 
-# todo: add logger
-
-
 # ------------------------- plotting -------------------------------
+
 def add_nodes(graph, nodes):  # stolen from http://matthiaseisen.com/articles/graphviz/
     for n in nodes:
         if isinstance(n, tuple):
@@ -145,7 +152,7 @@ def add_nodes(graph, nodes):  # stolen from http://matthiaseisen.com/articles/gr
     return graph
 
 
-def add_edges(graph, edges):
+def add_edges(graph, edges):  # stolen from http://matthiaseisen.com/articles/graphviz/
     for e in edges:
         if isinstance(e[0], tuple):
             graph.edge(*e[0], **e[1])
@@ -155,6 +162,7 @@ def add_edges(graph, edges):
 
 
 # ---------------------------- logger ---------------------------------
+
 def logger(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -162,6 +170,7 @@ def logger(func):
         output = func(*args, **kwargs)
         print(f"----- {func.__name__}: end -----")
         return output
+
     return wrapper
 
 
@@ -173,7 +182,23 @@ def timeit(func):
         end = time.perf_counter()
         print(f'{func.__name__} took {end - start:.6f} seconds to complete')
         return result
+
     return wrapper
+
+
+# ------------------------------- tools ---------------------------------------
+
+class LazyAttribute(object):
+    """ A property that caches itself to the class object. """
+
+    def __init__(self, func):
+        functools.update_wrapper(self, func, updated=[])
+        self.getter = func
+
+    def __get__(self, obj, cls):
+        value = self.getter(cls)
+        setattr(cls, self.__name__, value)
+        return value
 
 
 if __name__ == "__main__":

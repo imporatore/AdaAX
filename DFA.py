@@ -6,7 +6,7 @@ from IPython.display import Image
 from IPython.display import display
 
 from States import State
-from utils import add_nodes, add_edges
+from utils import add_nodes, add_edges, LazyAttribute
 from config import START_PREFIX, SEP
 
 digraph = functools.partial(gv.Digraph, format='png')
@@ -78,6 +78,7 @@ class DFA:
         # return q == self.F
         return True
 
+    @LazyAttribute
     @property
     def edges(self):
         edges_dict = defaultdict(list)
@@ -89,7 +90,7 @@ class DFA:
 
         return edges_dict
 
-    # todo: require testing.
+    # todo: require testing
     def plot(self, force=False, maximum=60):
 
         if (not force) and len(self.Q) > maximum:

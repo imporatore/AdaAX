@@ -3,7 +3,10 @@ __pychache__/
 __pycache__/*.pyc
 
 /explore_GPT4.ipynb
+/test.py
+/test.ipynb
 
+/AdaAX-main/
 /backup/
 /easy_implementation/
 /lstar/
@@ -28,4 +31,3 @@ __pycache__/*.pyc
 *.pkl
 *.pickle
 *.csv
-/data/rnn_result/tomita_data_2/
