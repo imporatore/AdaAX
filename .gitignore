@@ -31,3 +31,4 @@ __pycache__/*.pyc
 *.pkl
 *.pickle
 *.csv
+testt.py

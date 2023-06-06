@@ -3,8 +3,6 @@
 # Hidden in core sets generated along 'extracted pattern', however, share common prefix, thence consistent hidden value.
 # Core sets generated along 'extracted pattern' are called pure sets instead for disambiguation.
 
-from collections import defaultdict
-
 import numpy as np
 
 from config import START_PREFIX
@@ -34,7 +32,6 @@ class State:
         """
 
         Args:
-            hidden_eval_func
             prefix: list, a list of symbols which initialize the State (as a PureSet).
                 - The first prefix upon which the PureSet is built.
                 - Also, the hidden value of this PureSet is evaluated on this prefix.
@@ -96,6 +93,5 @@ if __name__ == "__main__":
     from utils import RNNLoader
 
     loader = RNNLoader('tomita_data_1', 'lstm')
-    State._h = State().h(loader)
     start_state = build_start_state()
     print(start_state.h(loader))

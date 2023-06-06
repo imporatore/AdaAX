@@ -3,15 +3,16 @@ import warnings
 import numpy as np
 from sklearn.cluster import KMeans
 
-from config import K, THETA, START_PREFIX, SEP
+from config import K, THETA, START_PREFIX
 
 
 def pattern_extraction(rnn_loader, remove_padding=True, label=True):
     """ Extract patterns by DFS backtracking at the level of core(focal) sets.
 
         Args:
-            rnn_loader
-            remove_padding
+            rnn_loader: RNN data loader.
+            remove_padding: bool, if True, then remove the padding symbol in extracted patterns.
+            label: bool, True for adding positive patterns and vice versa.
 
         Params:
             K: Initial cluster numbers, determined by elbow method
@@ -21,6 +22,9 @@ def pattern_extraction(rnn_loader, remove_padding=True, label=True):
             patterns: list[list], list of patterns, each pattern is a list of symbols which
                 leads to a core(pure) set, and finally reaches accept state.
             support: list[float], data support(percentage in the sample) for corresponding pattern
+
+        Note:
+            Extracted patterns are unique.
         """
 
     def _clustering():
@@ -107,13 +111,10 @@ def pattern_extraction(rnn_loader, remove_padding=True, label=True):
     return patterns, support
 
 
-# Yet, the PatternTree is analogous to building a DFA without the consolidation phase for now.
-# Unused for now, can be used to visualize patterns and corresponding support.
 class PatternTree:
-    """ Prefix tree for extracted pattern, with support updated."""
+    """ Prefix tree for extracted pattern, with both positive & negative support updated."""
 
     def __init__(self, prefix_tree):
-        self.tree = prefix_tree
         self.root = prefix_tree.root
 
     def update_patterns(self, patterns, support, label=True):
@@ -121,8 +122,6 @@ class PatternTree:
             # if START_SYMBOL, the first symbol of pattern would be START_SYMBOL
             self._update(p[len(START_PREFIX):], s, label=label)
 
-    # Seems there can't be two same pattern extracted.
-    # todo: modify the code.
     def _update(self, p, s, label):
         cur = self.root
         for symbol in p:
@@ -130,40 +129,71 @@ class PatternTree:
                 if n.val == symbol:
                     cur = n
                     if label:
-                        try:
-                            cur.pos_sup += s
-                        except AttributeError:
-                            cur.pos_sup = s
+                        cur.pos_sup += s
                     else:
-                        try:
-                            cur.neg_sup += s
-                        except AttributeError:
-                            cur.neg_sup = s
+                        cur.neg_sup += s
                     break
             else:
                 warnings.warn("Node for pattern %s not found." % p)
 
-    def eval_hidden(self, s):
-        return self.tree.eval_hidden(s)
-
-    # so that we don't have to start from the start state when adding new pattern
+    # todo: No pattern is another pattern's prefix.
     def __iter__(self):
         """ Parse the tree using DFS.
 
-        Return:
+        Note:
+            No pattern is another pattern's prefix.
 
+        Return:
+            expr: list, list of symbols
+            h: list, list of hidden values in expr
+            sup: tuple(float, float), positive and negative support of expr
         """
-        stack = [(self.root, self.root.val)]
+        stack = [(self.root, [self.root.val], [self.root.h])]
         while stack:
-            node, expr = stack.pop()
+            node, expr, hidden = stack.pop()
             if not node.next:
-                yield expr, node.pos_sup, node.neg_sup
+                yield expr, hidden, node.pos_sup, node.neg_sup
             else:
                 for n in node.next:
                     if n.val == '<pad>':
-                        yield expr, node.pos_sup, node.neg_sup
+                        yield expr, hidden, node.pos_sup, node.neg_sup
                     else:
-                        stack.append((n, expr + SEP + n.val))
+                        stack.append((n, expr + [n.val], hidden + [n.h]))
+
+
+class PositivePatternTree(PatternTree):
+
+    def _update(self, p, s, label=True):
+        cur = self.root
+        for symbol in p:
+            for n in cur.next:
+                if n.val == symbol:
+                    cur = n
+                    cur.pos_sup += s
+            else:
+                warnings.warn("Node for pattern %s not found." % p)
+        cur._pos_pat = True
+
+    def __iter__(self):
+        """ Parse the tree using DFS.
+
+        Note:
+            No pattern is another pattern's prefix.
+
+        Return:
+            expr: list, list of symbols, positive patterns
+            h: list, list of hidden values in expr
+            sup: float, positive and negative support of the pattern
+        """
+        stack = [(self.root, [self.root.val], [self.root.h])]
+        while stack:
+            node, expr, hidden = stack.pop()
+            try:
+                if node._pos_pat:
+                    yield expr, hidden, node.pos_sup
+            except AttributeError:
+                for n in node.next:
+                    stack.append((n, expr + [n.val], hidden + [n.h]))
 
 
 if __name__ == "__main__":
@@ -171,10 +201,17 @@ if __name__ == "__main__":
 
     loader = RNNLoader('tomita_data_1', 'gru')
     pos_patterns, pos_supports = pattern_extraction(loader, label=True)
-    neg_patterns, neg_supports = pattern_extraction(loader, label=False)
-    pattern_tree = PatternTree(loader.prefix_tree)
-    pattern_tree.update_patterns(pos_patterns, pos_supports, label=True)
-    pattern_tree.update_patterns(neg_patterns, neg_supports, label=False)
-    for res in pattern_tree:
+    # neg_patterns, neg_supports = pattern_extraction(loader, label=False)
+
+    # pattern_tree = PatternTree(loader.prefix_tree)
+    # pattern_tree.update_patterns(pos_patterns, pos_supports, label=True)
+    # pattern_tree.update_patterns(neg_patterns, neg_supports, label=False)
+
+    # for res in pattern_tree:
+    #     print(res)
+
+    pos_pattern_tree = PositivePatternTree(loader.prefix_tree)
+    pos_pattern_tree.update_patterns(pos_patterns, pos_supports)
+    for res in pos_pattern_tree:
         print(res)
     pass

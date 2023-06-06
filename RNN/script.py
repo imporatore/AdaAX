@@ -79,7 +79,7 @@ if __name__ == "__main__":
     # for nam in names:
     #     for mod in models:
     #         run(nam, mod)
-    run('tomita1', 'lstm', {"load_vocab": True, "load_loader": True})
+    run('synthetic1', 'gru', {"load_vocab": True, "load_loader": True})
     run('tomita1', 'gru', {"load_vocab": True, "load_loader": True})
     run('yelp', 'lstm', {"load_vocab": True, "load_loader": True})
     run('yelp', 'gru', {"load_vocab": True, "load_loader": True})

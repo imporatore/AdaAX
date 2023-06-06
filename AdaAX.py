@@ -5,18 +5,19 @@ import numpy as np
 from config import START_PREFIX, TAU, DELTA
 from States import build_start_state, build_accept_state
 from DFA import DFA
-from Pattern import pattern_extraction
+from Pattern import pattern_extraction, PositivePatternTree
 from utils import d
+from Helpers import check_consistency
 
 
-# todo: add pattern by PatternTree
-# todo: require testing
 # todo: if the merging stage is cooperated in the adding stage, would it be faster?
-def add_pattern(dfa, p):
-    """ Add new? pattern to DFA
+def add_pattern(dfa, p, h):
+    """ Add new pattern to DFA
 
     Args:
+        dfa: DFA, the dfa modified in-place
         p: list, pattern is a list of symbols
+        h: list, list of hidden values of each prefix in p
 
     Returns:
         Q_new: list, new states (pure sets) added by the pattern
@@ -29,16 +30,14 @@ def add_pattern(dfa, p):
         if s in dfa.delta[q1].keys():
             q1 = dfa.delta[q1][s]
         else:
-            q1 = dfa.add_new_state(START_PREFIX + p[:i + 1], q1)
+            q1 = dfa.add_new_state(START_PREFIX + p[:i + 1], h[i], prev=q1)
             Q_new.append(q1)
 
     dfa.add_transit(q1, p[-1], dfa.F)  # add transition of the last symbol to accept state
     return Q_new
-    # todo: add pattern by PatternTree
-    # todo: require testing
 
 
-def build_dfa(dfa, patterns, merge_start, merge_accept):
+def build_dfa(loader, dfa, patterns, merge_start, merge_accept):
     """ Build DFA using extracted patterns
 
     Args:
@@ -48,15 +47,18 @@ def build_dfa(dfa, patterns, merge_start, merge_accept):
         TAU: threshold for neighbour distance
         DELTA: threshold for merging fidelity loss
     """
-    for p in patterns:
+    for p, h, _ in patterns:  # (pattern, hidden, support)
         # list of new states created by pattern
-        A_t = dfa.add_pattern(p[len(START_PREFIX):])  # if START_SYMBOL, first symbol in pattern is START_SYMBOL
-        while A_t:
+        # if START_SYMBOL, first symbol in pattern is START_SYMBOL
+        # A_t is modified as a private attribute of dfa so that it can be mapped while deepcopy,
+        # or I would have to write explicit mapping dict.
+        dfa.A_t = add_pattern(dfa, p[len(START_PREFIX):], h[len(START_PREFIX):])
+        while dfa.A_t:
 
-            assert all([st in dfa.Q for st in A_t])
+            assert all([st in dfa.Q for st in dfa.A_t])  # todo: test
 
             # try merge new states in A_t
-            q_t = A_t.pop()
+            q_t = dfa.A_t.pop()
             if merge_start:
                 if merge_accept:
                     N_t = {s: d(q_t._h, s._h) for s in dfa.Q if s != q_t}  # neighbours of q_t
@@ -73,16 +75,15 @@ def build_dfa(dfa, patterns, merge_start, merge_accept):
                     break
 
                 new_dfa = merge_states(dfa, q_t, s)  # create the DFA after merging
-                if dfa.fidelity - new_dfa.fidelity < DELTA:  # accept merging if fidelity loss below threshold
-                    dfa.Q, dfa.q0, dfa.F = new_dfa.Q, new_dfa.q0, new_dfa.F  # update states
-                    dfa.delta = new_dfa.delta  # update transitions
-                    A_t = [new_dfa.__mapping[state] for state in A_t]
+                # accept merging if fidelity loss below threshold
+                if dfa.fidelity(loader) - new_dfa.fidelity(loader) < DELTA:
+                    dfa = new_dfa
                     break
 
 
 # todo: require testing
 # todo: test for self-loop and transition to the state it merges with
-def merge_states(dfa, state1, state2):
+def merge_states(dfa, state1, state2, inplace=False):
     """ Try merging state1 with state2.
 
     Notice that if the child state not consistent, they will also be merged.
@@ -97,92 +98,52 @@ def merge_states(dfa, state1, state2):
     # todo: forbid merging accept state
     # todo: add threshold for merging accept state
     # todo: the hidden state values remains after merging
-    new_dfa = copy.deepcopy(dfa)
+    new_dfa = copy.deepcopy(dfa) if not inplace else dfa
     mapping = {s: ns for s, ns in zip(dfa.Q, new_dfa.Q)}
     mapped_state1, mapped_state2 = mapping[state1], mapping[state2]
-    new_state = copy.deepcopy(mapped_state2)
-
-    for s in new_state.parents.keys():
-        if mapped_state2 in new_state.parents[s]:
-            new_state.parents[s].remove(mapped_state2)
-            new_state.parents[s].append(new_state)
-        if mapped_state1 in new_state.parents[s]:
-            new_state.parents[s].remove(mapped_state1)
-            if new_state not in new_state.parents[s]:
-                new_state.parents[s].append(new_state)
 
     # todo: check if start & accept state would be merged
     # Update start and accept states if merged.
-    if state2 == dfa.q0:
-        new_dfa.q0 = new_state
-    elif state2 == dfa.F:
-        new_dfa.F = new_state
+    if state1 == dfa.q0:
+        new_dfa.q0 = mapped_state2
+    elif state1 == dfa.F:
+        new_dfa.F = mapped_state2
 
-    # update children set
-    for s in mapped_state1.parents.keys():
-        for p in mapped_state1.parents[s]:
-            if p not in new_state.parents[s]:
-                if p == mapped_state1 or p == mapped_state2:  # self-loop
-                    new_state.parents[s] += [new_state]
-                else:
-                    new_state.parents[s] += [p]
+    # update to-merge list
+    if state1 in dfa.A_t and state2 not in dfa.A_t:
+        new_dfa.A_t.remove(mapped_state1)
+        new_dfa.A_t.append(mapped_state2)
 
-    # update states
-    new_dfa.Q.append(new_state)
+    # update state list
     new_dfa.Q.remove(mapped_state1)
-    new_dfa.Q.remove(mapped_state2)
 
-    # Update income transitions
-    for s in new_state.parents.keys():
-        for state in new_state.parents[s]:
-            new_dfa.delta[state][s] = new_state
-    # todo: seems no self loop with mapped_state1 & mapped_state2 exists
-    # Update outgoing transitions
-    transition1 = new_dfa.delta.pop(mapped_state1)
-    transition2 = new_dfa.delta.pop(mapped_state2)
-    for s in transition1.keys():
-        child1 = transition1[s]
-        if child1 == mapped_state1 or child1 == mapped_state2:
-            child1 = new_state  #
-        try:
-            child2 = transition2.pop(s)
-            if child2 == mapped_state2 or child2 == mapped_state1:
-                child2 = new_state
-            # todo: self loop
-            if child1 != child2:
-                # Merge outgoing states for common outgoing symbol if child state doesn't correspond
-                new_dfa = new_dfa._merge_states(child1, child2)
-            else:
-                # update consistent child state
-                new_dfa._add_transit(new_state, s, child1)
-                if child1 != new_state:
-                    child1.parents[s].remove(mapped_state1)
-                    child2.parents[s].remove(mapped_state2)
-        except KeyError:  # outgoing symbol only in state1
-            if child1 == mapped_state1 or child1 == mapped_state2:
-                new_dfa._add_transit(new_state, s, new_state)
-            else:
-                new_dfa._add_transit(new_state, s, child1)
-                child1.parents[s].remove(mapped_state1)
+    # update transition table
+    forward, backward = new_dfa.delta.pop(mapped_state1)
 
-    for s, child in transition2.items():  # outgoing symbol only in state2
-        if child == mapped_state2 or child == mapped_state1:
-            new_dfa._add_transit(new_state, s, new_state)
-        else:
-            new_dfa._add_transit(new_state, s, child)
-            child.parents[s].remove(mapped_state2)
+    # update entering (state2) transitions
+    for s in backward.keys():
+        for parent in backward[s]:
+            if parent == mapped_state1:
+                # todo: note that this is a self loop and may encounter conflict for exiting transitions
+                pass  # Note that this self-loop will also exist when updating exiting transitions
+            else:  # since the transition is deterministic, they MUST NOT be state2's parents
+                assert parent not in new_dfa.delta.get_backward(mapped_state2)[s]
+                new_dfa.add_transit(parent, s, mapped_state2)
 
-    new_dfa.__mapping[state1] = new_state
-    new_dfa.__mapping[state2] = new_state
+    # update exiting
+    for s, c in forward.items():
+        child = mapped_state2 if c == mapped_state1 else c  # self-loop
+        if s not in new_dfa.delta[mapped_state2].keys():
+            new_dfa.add_transit(mapped_state2, s, child)
+        elif new_dfa.delta[mapped_state2][s] != child:
+            new_dfa = merge_states(new_dfa, child, new_dfa.delta[mapped_state2][s], inplace=True)
 
-    for st in new_dfa.delta.keys():
-        for s in new_dfa.delta.keys():
-            assert all([c in new_dfa.Q for c in new_dfa.delta[st][s]])
+    check_consistency(new_dfa)
 
     return new_dfa
 
 
-def main(rnn_loader, merge_start=True, merge_accept=False):
+def main(rnn_loader, merge_start=True, merge_accept=True, plot=True):
 
     start_state = build_start_state()
     start_state._h = start_state.h(rnn_loader)
@@ -191,14 +152,20 @@ def main(rnn_loader, merge_start=True, merge_accept=False):
 
     dfa = DFA(rnn_loader.alphabet, start_state, accept_state)
 
-    def _build_add_state(prefixes, prev):
-        state = dfa.add_new_state(prefixes, prev)
-        state._h = state.h(rnn_loader)
-
-    dfa.add_new_state = _build_add_state
-    dfa.add_pattern = lambda p: add_pattern(dfa, p)
-
     patterns, support = pattern_extraction(rnn_loader, remove_padding=True)
+    pattern_tree = PositivePatternTree(rnn_loader.prefix_tree)
+    pattern_tree.update_patterns(patterns, support)
 
-    build_dfa(dfa, patterns, merge_start, merge_accept)
+    build_dfa(rnn_loader, dfa, patterns, merge_start, merge_accept)
 
+    if plot:
+        dfa.plot()
+
+    return dfa
+
+
+if __name__ == "__main__":
+    from utils import RNNLoader
+
+    loader = RNNLoader('tomita_data_1', 'gru')
+    main(loader)

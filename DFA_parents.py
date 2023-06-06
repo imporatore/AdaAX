@@ -7,7 +7,7 @@ import graphviz as gv
 from IPython.display import Image
 from IPython.display import display
 
-from States_copy import State, build_start_state, build_accept_state
+from States_parents import State, build_start_state, build_accept_state
 from utils import d, add_nodes, add_edges, LazyAttribute
 from config import TAU, DELTA, START_PREFIX, SEP
 

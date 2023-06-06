@@ -20,12 +20,9 @@ class SymbolNode(object):
         if item in ['pos_sup', 'neg_sup']:
             try:
                 return super().__getattr__(item)
-                # return self.__dict__[item]
             except AttributeError:
-                # except KeyError:
                 return 0
         return super().__getattr__(item)
-        # return self.__dict__[item]
 
     @property
     def sup(self):
@@ -128,7 +125,7 @@ class RNNLoader:
         return sep.join(text)
 
     # todo: only called when merging, may use cashed result to accelerate, as the difference in the merged DFA is small
-    def fidelity(self, dfa):
+    def eval_fidelity(self, dfa):
         """ Evaluate the fidelity of (extracted) DFA from rnn_loader."""
         return np.mean([dfa.classify_expression(self.decode(expr, as_list=True)) == ro for expr, ro in zip(
             self.input_sequences, self.rnn_output)])
