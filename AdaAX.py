@@ -130,7 +130,7 @@ def merge_states(dfa, state1, state2, inplace=False):
                 assert parent not in new_dfa.delta.get_backward(mapped_state2)[s]
                 new_dfa.add_transit(parent, s, mapped_state2)
 
-    # update exiting
+    # update exiting transitions
     for s, c in forward.items():
         child = mapped_state2 if c == mapped_state1 else c  # self-loop
         if s not in new_dfa.delta[mapped_state2].keys():
@@ -138,7 +138,7 @@ def merge_states(dfa, state1, state2, inplace=False):
         elif new_dfa.delta[mapped_state2][s] != child:
             new_dfa = merge_states(new_dfa, child, new_dfa.delta[mapped_state2][s], inplace=True)
 
-    check_consistency(new_dfa)
+    check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True)
 
     return new_dfa
 

@@ -2,7 +2,7 @@ from functools import wraps
 
 
 def check_consistency(dfa, check_transition=True, check_state=True, check_empty=False):
-    if check_transition:
+    if check_transition:  # only available in bidirectional transition table
         try:
             dfa.delta._check_transition_consistency()
         except AssertionError as message:
