@@ -1,61 +1,122 @@
+import copy
 from collections import defaultdict
 
 
-class ForwardTransition(dict):
+class WrappedDict:
 
-    def __init__(self, table, state, **kwargs):
-        self.table, self.state = table, state
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        self._items = dict(*args, **kwargs)
+
+    def __contains__(self, item):
+        return self._items.__contains__(item)
+
+    def __iter__(self):
+        return self._items.__iter__()
+
+    def __len__(self):
+        return self._items.__len__()
+
+    def __bool__(self):
+        return bool(self._items)
 
     def __getitem__(self, item):
-        return super(ForwardTransition, self).__getitem__(item)
+        if item in self._items.keys():
+            return self._items.__getitem__(item)
+        else:
+            return self.__missing__(item)
+
+    def __setitem__(self, key, value):
+        self._items.__setitem__(key, value)
+
+    def __delitem__(self, key):
+        self._items.__delitem__(key)
+
+    def keys(self):
+        return self._items.keys()
+
+    def values(self):
+        return self._items.values()
+
+    def items(self):
+        return self._items.items()
+
+    def get(self, *args, **kwargs):
+        return self._items.get(*args, **kwargs)
+
+    def pop(self, k, **kwargs):
+        return self._items.pop(k, **kwargs)
+
+    def popitem(self):
+        return self._items.popitem()
+
+    def update(self, *args, **kwargs):
+        self._items.update(*args, **kwargs)
+
+    def __missing__(self, key):
+        pass
+
+
+class ForwardTransition(WrappedDict):
+
+    def __init__(self, table, state, *args, **kwargs):
+        self.__table, self.__state = table, state
+        super().__init__(*args, **kwargs)
 
     def __setitem__(self, key, value):
         """ Update transition self.state ----> key ----> value."""
-        if key in self.keys():
-            self.table.backward[self[key]][key].remove(self.state)
-        super(ForwardTransition, self).__setitem__(key, value)
-        if self.state not in self.table.backward[value][key]:
-            self.table.backward[value][key].append(self.state)
+        if key in self._items.keys():
+            self.__table.backward[self._items[key]][key].remove(self.__state)
+        self._items.__setitem__(key, value)
+        if self.__state not in self.__table.backward[value][key]:
+            self.__table.backward[value][key].append(self.__state)
 
     def __missing__(self, key):
-        # self[key] = None
+        # self._items[key] = None
         # return super(ForwardTransition, self).__getitem__(key)
         return None
 
 
-class BackwardTransition(dict):
+class BackwardTransition(WrappedDict):
 
-    def __init__(self, table, state, **kwargs):
-        self.table, self.state = table, state
-        super().__init__(**kwargs)
-
-    def __getitem__(self, item):
-        return super(BackwardTransition, self).__getitem__(item)
+    def __init__(self, table, state, *args, **kwargs):
+        self.__table, self.__state = table, state
+        super().__init__(*args, **kwargs)
 
     def __missing__(self, key):
-        self[key] = list()
-        return super(BackwardTransition, self).__getitem__(key)
+        self._items[key] = list()
+        return self._items.__getitem__(key)
+
+    def __len__(self):
+        return sum([len(transit) for transit in self.values()])
 
 
-class Table(dict):
+class Table(WrappedDict):
 
-    def __init__(self, table, direction, **kwargs):
-        self.table, self.direction = table, direction
-        super().__init__(**kwargs)
-
-    def __getitem__(self, item):
-        return super(Table, self).__getitem__(item)
+    def __init__(self, table, direction, *args, **kwargs):
+        self.__table, self.__direction = table, direction
+        super().__init__(*args, **kwargs)
 
     def __missing__(self, key):
-        if self.direction == 'forward':
-            self[key] = ForwardTransition(self.table, key)
-        elif self.direction == 'backward':
-            self[key] = BackwardTransition(self.table, key)
-        return super(Table, self).__getitem__(key)
+        if self.__direction == 'forward':
+            self._items[key] = ForwardTransition(self.__table, key)
+        elif self.__direction == 'backward':
+            self._items[key] = BackwardTransition(self.__table, key)
+        return self._items.__getitem__(key)
+
+    def __len__(self):
+        return sum([len(transition) for transition in self.values()])
+
+    def pop(self, k, **kwargs):
+        try:
+            return self._items.pop(k, **kwargs)
+        except KeyError:
+            if self.__direction == 'forward':
+                return ForwardTransition(self.__table, k)
+            elif self.__direction == 'backward':
+                return BackwardTransition(self.__table, k)
 
 
-class TransitionTable:
+class TransitionTable:  # todo: __new__
 
     def __init__(self):
         self.forward = Table(self, direction='forward')  # dict{state: dict{symbol: state}}
@@ -68,6 +129,9 @@ class TransitionTable:
         self.forward.__setitem__(key, value)
         for symbol, state in value.items():
             self.backward[state][symbol].append(key)
+
+    def __len__(self):
+        return self.forward.__len__()
 
     def keys(self):
         return self.forward.keys()
@@ -142,12 +206,19 @@ if __name__ == '__main__':
     import random
 
     delta = TransitionTable()
-    for i in range(100):
-        delta[random.randint(0, 10)][random.choice('abcdefgh')] = random.randint(0, 10)
-    delta._check_transition_consistency()
-    delta._check_state_consistency([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    delta[1]['a'] = 2
+    # delta.backward._Table__table
+    # delta.forward._Table__table
+    delta[1]['b'] = 3
+    delta[2]['a'] = 3
+    #
+    # for i in range(100):
+    #     delta[random.randint(0, 10)][random.choice('abcdefgh')] = random.randint(0, 10)
+    # new_delta = copy.deepcopy(delta)
+    # delta._check_transition_consistency()
+    # delta._check_state_consistency([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     print(delta.pop(1))
-    delta._check_transition_consistency()
-    delta._check_state_consistency([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    delta._check_state_consistency([0, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    # delta._check_transition_consistency()
+    # delta._check_state_consistency([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    # delta._check_state_consistency([0, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     pass

@@ -44,7 +44,7 @@ class State:
         elif not isinstance(prefixes, list):
             raise ValueError("Argument prefixes must be a list.")
         # todo: add support for each prefix
-        if not isinstance(prefixes[0], list):
+        elif not isinstance(prefixes[0], list):
             self.prefixes = [prefixes]
         else:
             self.prefixes = prefixes

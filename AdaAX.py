@@ -1,6 +1,7 @@
 import copy
 
 import numpy as np
+import tqdm
 
 from config import START_PREFIX, TAU, DELTA
 from States import build_start_state, build_accept_state
@@ -47,7 +48,7 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept):
         TAU: threshold for neighbour distance
         DELTA: threshold for merging fidelity loss
     """
-    for p, h, _ in patterns:  # (pattern, hidden, support)
+    for p, h, _ in tqdm.tqdm(patterns):  # (pattern, hidden, support)
         # list of new states created by pattern
         # if START_SYMBOL, first symbol in pattern is START_SYMBOL
         # A_t is modified as a private attribute of dfa so that it can be mapped while deepcopy,
@@ -110,9 +111,10 @@ def merge_states(dfa, state1, state2, inplace=False):
         new_dfa.F = mapped_state2
 
     # update to-merge list
-    if state1 in dfa.A_t and state2 not in dfa.A_t:
+    if state1 in dfa.A_t:
         new_dfa.A_t.remove(mapped_state1)
-        new_dfa.A_t.append(mapped_state2)
+        if state2 not in dfa.A_t:
+            new_dfa.A_t.append(mapped_state2)
 
     # update state list
     new_dfa.Q.remove(mapped_state1)
@@ -131,13 +133,20 @@ def merge_states(dfa, state1, state2, inplace=False):
                 new_dfa.add_transit(parent, s, mapped_state2)
 
     # update exiting transitions
-    for s, c in forward.items():
+    while forward:
+        s, c = forward.popitem()
         child = mapped_state2 if c == mapped_state1 else c  # self-loop
         if s not in new_dfa.delta[mapped_state2].keys():
             new_dfa.add_transit(mapped_state2, s, child)
         elif new_dfa.delta[mapped_state2][s] != child:
             new_dfa = merge_states(new_dfa, child, new_dfa.delta[mapped_state2][s], inplace=True)
+            # items (states) in forward should be updated
+            for s_ in forward.keys():
+                if forward[s_] == child:
+                    forward[s_] = new_dfa.delta[mapped_state2][s]
 
+    # if not inplace:  # Only check consistency when all merging is done
+    #     check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True)
     check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True)
 
     return new_dfa
@@ -156,7 +165,7 @@ def main(rnn_loader, merge_start=True, merge_accept=True, plot=True):
     pattern_tree = PositivePatternTree(rnn_loader.prefix_tree)
     pattern_tree.update_patterns(patterns, support)
 
-    build_dfa(rnn_loader, dfa, patterns, merge_start, merge_accept)
+    build_dfa(rnn_loader, dfa, pattern_tree, merge_start, merge_accept)
 
     if plot:
         dfa.plot()

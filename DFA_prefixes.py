@@ -1,5 +1,5 @@
 import functools
-from collections import defaultdict, Iterable
+from collections import defaultdict
 
 import graphviz as gv
 from IPython.display import Image
@@ -43,7 +43,7 @@ class DFA:
         self.Q.append(state)  # Add to states
 
         if prev:
-            if isinstance(prev, Iterable):
+            if isinstance(prev, list):
                 for p in prev:
                     self.add_transit(p, prefix[-1], state)  # Update transition
             else:

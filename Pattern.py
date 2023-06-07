@@ -170,6 +170,7 @@ class PositivePatternTree(PatternTree):
                 if n.val == symbol:
                     cur = n
                     cur.pos_sup += s
+                    break
             else:
                 warnings.warn("Node for pattern %s not found." % p)
         cur._pos_pat = True

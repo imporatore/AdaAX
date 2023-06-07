@@ -163,7 +163,7 @@ def main(rnn_loader, merge_start=True, merge_accept=True, plot=True):
     pattern_tree = PositivePatternTree(rnn_loader.prefix_tree)
     pattern_tree.update_patterns(patterns, support)
 
-    build_dfa(rnn_loader, dfa, patterns, merge_start, merge_accept)
+    build_dfa(rnn_loader, dfa, pattern_tree, merge_start, merge_accept)
 
     if plot:
         dfa.plot()
