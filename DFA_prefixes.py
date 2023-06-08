@@ -83,7 +83,7 @@ class DFA:
         return rnn_loader.eval_fidelity(self)
 
     # todo: require testing
-    def plot(self, force=False, maximum=60):
+    def plot(self, fname, force=False, maximum=60):
 
         edges = defaultdict(list)
 
@@ -95,7 +95,7 @@ class DFA:
         if (not force) and len(self.Q) > maximum:
             raise Warning('State number exceeds limit (Maximum %d).' % maximum)
 
-        state2int = {}
+        state2int = {None: 0}
 
         def _state2int(state):
             if state not in state2int.keys():
@@ -110,13 +110,8 @@ class DFA:
 
         g = add_edges(g, [(e, {'label': SEP.join(edges[e])}) for e in edges.keys()])
 
-        display(Image(filename=g.render(filename='img/automaton')))
+        display(Image(filename=g.render(filename=fname)))
 
 
 if __name__ == "__main__":
-    from utils import RNNLoader
-
-    loader = RNNLoader('tomita_data_1', 'lstm')
-    dfa = DFA(loader)
-
     pass

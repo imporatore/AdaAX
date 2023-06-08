@@ -51,3 +51,4 @@ The pre-pruned DFA is based on patterns(symbols). Quite different from pre-clust
 
 
 * cashed_property
+* * bugs in start symbol

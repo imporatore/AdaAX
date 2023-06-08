@@ -198,6 +198,30 @@ class PositivePatternTree(PatternTree):
                     stack.append((n, expr + [n.val], hidden + [n.h]))
 
 
+class PatternIterator:
+
+    def __init__(self, prefix_tree, patterns, support=None):
+        self.root = prefix_tree.root
+        self.patterns = patterns
+        if support:
+            self.support = support
+        else:
+            self.support = [0.] * len(support)
+
+    def __iter__(self):
+        for
+        cur, hidden = self.root
+        for symbol in p:
+            for n in cur.next:
+                if n.val == symbol:
+                    cur = n
+                    cur.pos_sup += s
+                    break
+            else:
+                warnings.warn("Node for pattern %s not found." % p)
+        cur._pos_pat = True
+
+
 if __name__ == "__main__":
     from utils import RNNLoader
 
