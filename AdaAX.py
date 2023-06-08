@@ -75,7 +75,7 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept):
                 if N_t[s] >= TAU:  # threshold (Euclidean distance of hidden values) for merging states
                     break
 
-                new_dfa = merge_states(dfa, q_t, s)  # create the DFA after merging
+                new_dfa, _ = merge_states(dfa, q_t, s)  # create the DFA after merging
                 # accept merging if fidelity loss below threshold
                 if dfa.fidelity(loader) - new_dfa.fidelity(loader) < DELTA:
                     dfa = new_dfa
@@ -118,6 +118,7 @@ def merge_states(dfa, state1, state2, inplace=False):
 
     # update state list
     new_dfa.Q.remove(mapped_state1)
+    mapping[state1] = mapped_state2
 
     # update transition table
     forward, backward = new_dfa.delta.pop(mapped_state1)
@@ -139,17 +140,20 @@ def merge_states(dfa, state1, state2, inplace=False):
         if s not in new_dfa.delta[mapped_state2].keys():
             new_dfa.add_transit(mapped_state2, s, child)
         elif new_dfa.delta[mapped_state2][s] != child:
-            new_dfa = merge_states(new_dfa, child, new_dfa.delta[mapped_state2][s], inplace=True)
-            # items (states) in forward should be updated
+            new_dfa, mapping_ = merge_states(new_dfa, child, new_dfa.delta[mapped_state2][s], inplace=True)
+            #  update items (states) in forward
             for s_ in forward.keys():
                 if forward[s_] == child:
                     forward[s_] = new_dfa.delta[mapped_state2][s]
+            # update mapping
+            mapping = {s: mapping_[ns] for s, ns in mapping.items()}
+            mapped_state2 = mapping[state2]
 
     # if not inplace:  # Only check consistency when all merging is done
     #     check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True)
     check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True)
 
-    return new_dfa
+    return new_dfa, mapping
 
 
 def main(rnn_loader, merge_start=True, merge_accept=True, plot=True):
