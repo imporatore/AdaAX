@@ -1,45 +1,52 @@
-from config import RNN_MODEL_DIR, RNN_RESULT_DIR, START_SYMBOL
+from config import DFA_DIR, IMAGE_DIR, K, THETA, TAU, DELTA
 from utils import ConfigDict
-from main import main
+from AdaAX import main
 
 
-DEFAULT_CONFIG = {"model_dir": RNN_MODEL_DIR,
-                  "result_dir": RNN_RESULT_DIR,
-                  "dropout_rate": 0.5,
-                  "batch_size": 100,
+DEFAULT_CONFIG = {"dfa_dir": DFA_DIR,
+                  "image_dir": IMAGE_DIR,
                   # "start_symbol": START_SYMBOL,
-                  "load_vocab": False,
-                  "save_vocab": True,
-                  "load_loader": False,
-                  "save_loader": True,
-                  "load_model": False,
-                  "need_train": True}
+                  "plot": True}
 
 synthetic1_config = {"fname": "synthetic_data_1",
-                     "hidden_size": 16,
-                     "embedding_size": 16,
-                     "total_epoch": 5,  # 10 for RNN
-                     "learning_rate": 0.01}
+                     "clusters": K,
+                     "pruning": THETA,
+                     "merge_start": True,
+                     "merge_accept": True,
+                     "neighbour": TAU,
+                     "fidelity_loss": DELTA}
 
 synthetic2_config = {"fname": "synthetic_data_2",
-                     "hidden_size": 16,
-                     "embedding_size": 16,
-                     "total_epoch": 10,  # 5
-                     "learning_rate": 0.01}  # 0.005
+                     "clusters": K,
+                     "pruning": THETA,
+                     "merge_start": True,
+                     "merge_accept": True,
+                     "neighbour": TAU,
+                     "fidelity_loss": DELTA}
 
 tomita1_config = {"fname": "tomita_data_1",
-                  "hidden_size": 32,
-                  "embedding_size": 32,
-                  "total_epoch": 5,  # 10 for RNN
-                  "learning_rate": 0.005}
+                  "clusters": K,
+                  "pruning": THETA,
+                  "merge_start": True,
+                  "merge_accept": True,
+                  "neighbour": TAU,
+                  "fidelity_loss": DELTA}
 
-tomita2_config = {}
+tomita2_config = {"fname": "tomita_data_2",
+                  "clusters": K,
+                  "pruning": THETA,
+                  "merge_start": True,
+                  "merge_accept": True,
+                  "neighbour": TAU,
+                  "fidelity_loss": DELTA}
 
 yelp_config = {"fname": "yelp_review_balanced",
-               "hidden_size": 256,
-               "embedding_size": 300,
-               "total_epoch": 30,
-               "learning_rate": 0.001}
+               "clusters": K,
+               "pruning": THETA,
+               "merge_start": True,
+               "merge_accept": True,
+               "neighbour": TAU,
+               "fidelity_loss": DELTA}
 
 
 def run(name, type, config=None):
@@ -83,4 +90,3 @@ if __name__ == "__main__":
     run('tomita1', 'gru', {"load_vocab": True, "load_loader": True})
     run('yelp', 'lstm', {"load_vocab": True, "load_loader": True})
     run('yelp', 'gru', {"load_vocab": True, "load_loader": True})
-

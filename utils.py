@@ -198,5 +198,19 @@ class LazyAttribute(object):
         return value
 
 
+class ConfigDict:
+    """ Helper class for configuration."""
+
+    def __init__(self, config_dict):
+        # config_dict: a dict object holding configurations
+        self.config = config_dict
+
+    def __getattr__(self, item):
+        return self.config[item]
+
+    def update(self, new_config):
+        self.config.update(new_config)
+
+
 if __name__ == "__main__":
     loader = RNNLoader('tomita_data_1', 'lstm')

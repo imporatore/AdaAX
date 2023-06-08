@@ -3,10 +3,10 @@ import warnings
 import numpy as np
 from sklearn.cluster import KMeans
 
-from config import K, THETA, START_PREFIX
+from config import START_PREFIX
 
 
-def pattern_extraction(rnn_loader, remove_padding=True, label=True):
+def pattern_extraction(rnn_loader, cluster_num, pruning, remove_padding=True, label=True):
     """ Extract patterns by DFS backtracking at the level of core(focal) sets.
 
         Args:
@@ -15,8 +15,8 @@ def pattern_extraction(rnn_loader, remove_padding=True, label=True):
             label: bool, True for adding positive patterns and vice versa.
 
         Params:
-            K: Initial cluster numbers, determined by elbow method
-            THETA: threshold for pruning focal set(split by clusters)
+            cluster_num: Initial cluster numbers, determined by elbow method
+            pruning: threshold for pruning focal set(split by clusters)
 
         Return:
             patterns: list[list], list of patterns, each pattern is a list of symbols which
@@ -31,7 +31,7 @@ def pattern_extraction(rnn_loader, remove_padding=True, label=True):
         """ Pre-clustering to reduce complexity when backtracking."""
         N, L = rnn_loader.hidden_states.shape[:2]
         # first layer (start state) & last layer (accept state) doesn't participate in the clustering stage
-        kmeans = KMeans(n_clusters=K, init='k-means++', n_init='auto').fit(
+        kmeans = KMeans(n_clusters=cluster_num, init='k-means++', n_init='auto').fit(
             rnn_loader.hidden_states[:, len(START_PREFIX): -1, :].reshape((N * (L - 1 - len(START_PREFIX)), -1)))
         # add a cluster -1 for start state
         start_cluster = np.array([-1] * N, dtype=np.int32).reshape((N, 1))
@@ -65,7 +65,7 @@ def pattern_extraction(rnn_loader, remove_padding=True, label=True):
 
         # Split previous states by cluster_ids
         # ! Could be moved inside the for loop of cluster to save memory
-        inds = {k: [i for i in ind if clusters[i, lvl - 1] == k] for k in range(-1, K)}
+        inds = {k: [i for i in ind if clusters[i, lvl - 1] == k] for k in range(-1, cluster_num)}
         # Sort cluster ids by the size each sub cluster
         cluster_ids = sorted(inds.keys(), key=lambda x: len(inds[x]), reverse=True)
 
@@ -74,7 +74,7 @@ def pattern_extraction(rnn_loader, remove_padding=True, label=True):
             # Prune if the size of sub cluster is too small
             # ? Actually we are not calculating the data support of core set, instead we sum by symbols
             # ! Use break instead of continue since we have already sorted cluster_ids by its size in descent order
-            if len(inds[k]) / rnn_loader.decoded_input_seq.shape[0] < THETA:
+            if len(inds[k]) / rnn_loader.decoded_input_seq.shape[0] < pruning:
                 break
 
             # ! Likewise, move it outside the for loop for accelerating
@@ -161,6 +161,7 @@ class PatternTree:
                         stack.append((n, expr + [n.val], hidden + [n.h]))
 
 
+# todo
 class PositivePatternTree(PatternTree):
 
     def _update(self, p, s, label=True):

@@ -52,6 +52,9 @@ class WrappedDict:
     def update(self, *args, **kwargs):
         self._items.update(*args, **kwargs)
 
+    def todict(self):
+        return self._items
+
     def __missing__(self, key):
         pass
 
@@ -161,7 +164,7 @@ class TransitionTable:  # todo: __new__
                     if not self.backward[state]:
                         del self.backward[state]
 
-        return forward_transition, backward_transition
+        return forward_transition.todict(), backward_transition.todict()
 
     def _check_transition_consistency(self):
         """ Check consistency of forward and backward transitions."""

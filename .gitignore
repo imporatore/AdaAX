@@ -26,6 +26,9 @@ __pycache__/*.pyc
 /data/tomita_data/*.pickle
 /data/real_data/*.csv
 /data/rnn_checkpoints/*.pkl
+/data/dfa/*.pickle
+/data/image/*.jpg
+/data/image/*.png
 
 *.npy
 *.pkl

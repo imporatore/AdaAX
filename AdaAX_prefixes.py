@@ -1,6 +1,7 @@
 import copy
 
 import numpy as np
+import tqdm
 
 from config import START_PREFIX, TAU, DELTA
 from States_prefixes import build_start_state, build_accept_state
@@ -48,7 +49,7 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept):
         TAU: threshold for neighbour distance
         DELTA: threshold for merging fidelity loss
     """
-    for p, h, _ in patterns:  # (pattern, hidden, support)
+    for p, h, _ in tqdm.tqdm(patterns):  # (pattern, hidden, support)
         # list of new states created by pattern
         # if START_SYMBOL, first symbol in pattern is START_SYMBOL
         # A_t is modified as a private attribute of dfa so that it can be mapped while deepcopy,
@@ -75,7 +76,7 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept):
                 if N_t[s] >= TAU:  # threshold (Euclidean distance of hidden values) for merging states
                     break
 
-                new_dfa = merge_states(dfa, q_t, s)  # create the DFA after merging
+                new_dfa, _ = merge_states(dfa, q_t, s)  # create the DFA after merging
                 # accept merging if fidelity loss below threshold
                 if dfa.fidelity(loader) - new_dfa.fidelity(loader) < DELTA:
                     dfa = new_dfa
@@ -111,15 +112,17 @@ def merge_states(dfa, state1, state2, inplace=False):
         new_dfa.F = mapped_state2
 
     # update to-merge list
-    if state1 in dfa.A_t and state2 not in dfa.A_t:
+    if state1 in dfa.A_t:
         new_dfa.A_t.remove(mapped_state1)
-        new_dfa.A_t.append(mapped_state2)
+        if state2 not in dfa.A_t:
+            new_dfa.A_t.append(mapped_state2)
 
     # update prefixes
     mapped_state2.prefixes.extend(mapped_state1.prefixes)
 
     # update state list
     new_dfa.Q.remove(mapped_state1)
+    mapping[state1] = mapped_state2
 
     # update entering (state2) transitions
     prefixes = mapped_state1.prefixes
@@ -164,6 +167,7 @@ def main(rnn_loader, merge_start=True, merge_accept=True, plot=True):
     pattern_tree.update_patterns(patterns, support)
 
     build_dfa(rnn_loader, dfa, pattern_tree, merge_start, merge_accept)
+
 
     if plot:
         dfa.plot()

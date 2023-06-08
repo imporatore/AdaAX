@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm, trange
 
 from config import RANDOM_STATE, RNN_MODEL_DIR, RNN_RESULT_DIR, START_SYMBOL
-from data.utils import save2csv, save2npy, save2pickle
+from data.utils import save2csv, save2npy
 from RNN.data_loader import get_loader
 from RNN.model import VanillaRNN, VanillaLSTMModel, VanillaGRUModel, GloveModel
 
@@ -174,9 +174,10 @@ def main(config):
     train_data, valid_data, test_data, vocab = get_loader(
         fname=config.fname,
         batch_size=config.batch_size,
-        start_symbol=config.start_symbol,
+        # start_symbol=config.start_symbol,
+        start_symbol=START_SYMBOL,
         load_vocab=config.load_vocab,
-        save_vocab=config.load_vocab,
+        save_vocab=config.save_vocab,
         load_loader=config.load_loader,
         save_loader=config.save_loader
     )
@@ -261,15 +262,13 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="rnn", choices=["rnn", "lstm", "gru", "glove-lstm"])
     parser.add_argument("--model_dir", type=str, default=RNN_MODEL_DIR)
     parser.add_argument("--result_dir", type=str, default=RNN_RESULT_DIR)
-    parser.add_argument("--start_symbol", type=str, default=START_SYMBOL)
+    # parser.add_argument("--start_symbol", type=str, default=START_SYMBOL)
     parser.add_argument("--load_vocab", type=bool, default=True)
     parser.add_argument("--save_vocab", type=bool, default=True)
     parser.add_argument("--load_loader", type=bool, default=True)
     parser.add_argument("--save_loader", type=bool, default=True)
-    # parser.add_argument("--load_data", type=bool, default=True)
     parser.add_argument("--load_model", type=bool, default=False)
     parser.add_argument("--need_train", type=bool, default=True)
-    # parser.add_argument("--vocab_path", type=str, default='vocab.pkl')
 
     # model parameters
     parser.add_argument("--hidden_size", type=int, default=256)
@@ -281,6 +280,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=100)
     parser.add_argument("--learning_rate", type=float, default=0.001)
     # parser.add_argument("--logging_rate", type=int, default=100)
+
     args = parser.parse_args()
 
     print(args)
