@@ -1,4 +1,3 @@
-import copy
 from collections import defaultdict
 
 
@@ -207,6 +206,7 @@ class TransitionTable:  # todo: __new__
 
 if __name__ == '__main__':
     import random
+    import copy
 
     delta = TransitionTable()
     delta[1]['a'] = 2
