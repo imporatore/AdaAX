@@ -1,10 +1,10 @@
 import functools
+from collections import defaultdict
 
 import graphviz as gv
 from pythomata import SimpleDFA  # help trimming, minimizing & plotting
 
-from States import State
-from Transition import TransitionTable
+from States_prefixes import State
 from utils import add_nodes, add_edges
 from config import START_PREFIX, SEP
 
@@ -25,14 +25,18 @@ class DFA:
         self.F = accept_state  # accept state
         self.Q = [self.q0, self.F]  # states
 
-        self.delta = TransitionTable()  # transition table
+        self.delta = defaultdict(dict)  # transition table
 
     # todo: use cashed result to accelerate
     def prefix2state(self, prefix):
-        """ Return the state in DFA for prefix."""
-        if prefix == START_PREFIX:
-            return self.q0
-        return self.delta[self.prefix2state(prefix[:-1])][prefix[-1]]
+        """ Return the state in DFA for prefix.
+
+        Note: We should use prefixes to index instead of parsing transition table as when this prefix2state is called,
+            the transition table hadn't update."""
+        for state in self.Q:
+            if prefix in state.prefixes:
+                return state
+        raise ValueError("State for prefix %s not found." % prefix)
 
     def add_new_state(self, prefix, hidden, prev=None):
         """ Add and return the new state from a new prefix."""
@@ -54,6 +58,13 @@ class DFA:
     def add_transit(self, state1, symbol, state2):
         """ Add a transition from state1 to state2 by symbol."""
         self.delta[state1][symbol] = state2  # update transition table
+
+        # todo: use graph-like node link instead of prefix set
+        # the prefixes cannot exceed the training set, or there will be problem concerning self loops and
+        # infinite prefixes
+        # for prefix in state1.prefixes:
+        #     if prefix + [symbol] not in state2.prefixes:
+        #         state2.prefixes.append(prefix + [symbol])
 
     # todo: require testing
     # todo: as we only extract patterns from positive samples, and DFA entirely built on these patterns
