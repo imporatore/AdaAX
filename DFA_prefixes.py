@@ -2,15 +2,14 @@ import functools
 from collections import defaultdict
 
 import graphviz as gv
-from IPython.display import Image
-from IPython.display import display
+from pythomata import SimpleDFA  # help trimming, minimizing & plotting
 
 from States_prefixes import State
 from utils import add_nodes, add_edges
 from config import START_PREFIX, SEP
 
-digraph = functools.partial(gv.Digraph, format='png')
-graph = functools.partial(gv.Graph, format='png')
+# digraph = functools.partial(gv.Digraph, format='png')
+# graph = functools.partial(gv.Graph, format='png')
 
 
 # todo: add state split to ensure gradually learning more & more difficult patterns from flow or samplers
@@ -19,6 +18,7 @@ class DFA:
     Attributes:
 
     """
+
     def __init__(self, alphabet, start_state, accept_state):
         self.alphabet = alphabet  # alphabet
         self.q0 = start_state  # start state
@@ -29,10 +29,14 @@ class DFA:
 
     # todo: use cashed result to accelerate
     def prefix2state(self, prefix):
-        """ Return the state in DFA for prefix."""
-        if prefix == START_PREFIX:
-            return self.q0
-        return self.delta[self.prefix2state(prefix[:-1])][prefix[-1]]
+        """ Return the state in DFA for prefix.
+
+        Note: We should use prefixes to index instead of parsing transition table as when this prefix2state is called,
+            the transition table hadn't update."""
+        for state in self.Q:
+            if prefix in state.prefixes:
+                return state
+        raise ValueError("State for prefix %s not found." % prefix)
 
     def add_new_state(self, prefix, hidden, prev=None):
         """ Add and return the new state from a new prefix."""
@@ -70,9 +74,12 @@ class DFA:
         # Expression is string with only letters in alphabet
         q = self.q0
         for s in expression[len(START_PREFIX):]:
-            q = self.delta[q][s]
-            if not q:  # if no transition found, then expression is not among the extracted patterns
-                return False
+            if s in self.delta[q].keys():
+                q = self.delta[q][s]
+            # if not q:  # if no transition found, then expression is not among the extracted patterns
+            #     return False
+            else:
+                continue
             if q == self.F:
                 return True
         # return q == self.F
@@ -82,35 +89,56 @@ class DFA:
     def fidelity(self, rnn_loader):
         return rnn_loader.eval_fidelity(self)
 
+    # todo: remove the usage of SimpleDFA and implement minimize, complete, trimming
+    def to_simpledfa(self, minimize=True, trim=True):
+        alphabet = set(self.alphabet)
+        states_mapping = {state: 'state' + str(i + 1) for i, state in enumerate(self.Q)}
+        states = set([states_mapping[state] for state in self.Q])
+        initial_state = states_mapping[self.q0]
+        accepting_states = {states_mapping[self.F]}
+
+        transition_function = {states_mapping[state]: {symbol: states_mapping[
+            s] for symbol, s in self.delta[state].items()} for state in self.delta.keys()}
+        dfa = SimpleDFA(states, alphabet, initial_state, accepting_states, transition_function)
+        if minimize:
+            dfa = dfa.minimize()
+        if trim:
+            dfa = dfa.trim()
+        return dfa
+
+    def plot(self, fname, minimize=True, trim=True):
+        graph = self.to_simpledfa(minimize=minimize, trim=trim).to_graphviz()
+        graph.render(filename=fname, format='png')
+
     # todo: require testing
-    def plot(self, fname, force=False, maximum=60):
-
-        edges = defaultdict(list)
-
-        for parent in self.delta.keys():
-            for s in self.delta[parent].keys():
-                child = self.delta[parent][s]
-                edges[(parent, child)] += [s]
-
-        if (not force) and len(self.Q) > maximum:
-            raise Warning('State number exceeds limit (Maximum %d).' % maximum)
-
-        state2int = {None: 0}
-
-        def _state2int(state):
-            if state not in state2int.keys():
-                state2int[state] = max(state2int.values()) + 1
-            return state2int[state]
-
-        g = digraph()
-        g = add_nodes(g, [(_state2int(self.q0), {'color': 'black', 'shape': 'hexagon', 'label': 'Start'})])
-        g = add_nodes(g, [(_state2int(state), {'color': 'black', 'label': str(_state2int(state))})
-                          for state in self.Q if state not in (self.q0, self.F)])
-        g = add_nodes(g, [(_state2int(self.F), {'color': 'green', 'shape': 'hexagon', 'label': 'Accept'})])
-
-        g = add_edges(g, [(e, {'label': SEP.join(edges[e])}) for e in edges.keys()])
-
-        display(Image(filename=g.render(filename=fname)))
+    # def plot(self, fname, force=False, maximum=60):
+    #
+    #     edges = defaultdict(list)
+    #
+    #     for parent in self.delta.keys():
+    #         for s in self.delta[parent].keys():
+    #             child = self.delta[parent][s]
+    #             edges[(parent, child)] += [s]
+    #
+    #     if (not force) and len(self.Q) > maximum:
+    #         raise Warning('State number exceeds limit (Maximum %d).' % maximum)
+    #
+    #     state2int = {None: 0}
+    #
+    #     def _state2int(state):
+    #         if state not in state2int.keys():
+    #             state2int[state] = max(state2int.values()) + 1
+    #         return str(state2int[state])
+    #
+    #     g = digraph()
+    #     g = add_nodes(g, [(_state2int(self.q0), {'color': 'black', 'shape': 'hexagon', 'label': 'Start'})])
+    #     g = add_nodes(g, [(_state2int(state), {'color': 'black', 'label': str(_state2int(state))})
+    #                       for state in self.Q if state not in (self.q0, self.F)])
+    #     g = add_nodes(g, [(_state2int(self.F), {'color': 'green', 'shape': 'hexagon', 'label': 'Accept'})])
+    #
+    #     g = add_edges(g, [(e, {'label': SEP.join(edges[e])}) for e in edges.keys()])
+    #
+    #     display(Image(filename=g.render(filename=fname)))
 
 
 if __name__ == "__main__":

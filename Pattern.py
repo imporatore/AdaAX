@@ -206,28 +206,30 @@ class PatternIterator:
         if support:
             self.support = support
         else:
-            self.support = [0.] * len(support)
+            self.support = [0.] * len(patterns)
 
     def __iter__(self):
-        for
-        cur, hidden = self.root
-        for symbol in p:
-            for n in cur.next:
-                if n.val == symbol:
-                    cur = n
-                    cur.pos_sup += s
+        for pattern, support in zip(self.patterns, self.support):
+            cur, hidden = self.root, [self.root.h]
+            for symbol in pattern[len(START_PREFIX):]:
+                for n in cur.next:
+                    if n.val == symbol:
+                        cur = n
+                        hidden.append(cur.h)
+                        break
+                else:
                     break
-            else:
-                warnings.warn("Node for pattern %s not found." % p)
-        cur._pos_pat = True
+            if len(hidden) == len(pattern):
+                yield pattern, hidden, support
 
 
 if __name__ == "__main__":
     from utils import RNNLoader
+    from config import K, THETA
 
     loader = RNNLoader('tomita_data_1', 'gru')
-    pos_patterns, pos_supports = pattern_extraction(loader, label=True)
-    # neg_patterns, neg_supports = pattern_extraction(loader, label=False)
+    pos_patterns, pos_supports = pattern_extraction(loader, cluster_num=K, pruning=THETA, label=True)
+    # neg_patterns, neg_supports = pattern_extraction(loader, cluster_num=K, pruning=THETA, label=False)
 
     # pattern_tree = PatternTree(loader.prefix_tree)
     # pattern_tree.update_patterns(pos_patterns, pos_supports, label=True)

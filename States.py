@@ -8,21 +8,7 @@ import numpy as np
 from config import START_PREFIX
 
 
-class PureSet:
-    """ Pure Sets are determined by only one prefix(path), so have consistent hidden value."""
-
-    def __init__(self, prefix):
-        """
-
-        Args:
-            prefix: list, a list of symbols which form the path from the start h0 to this 'pure set'.
-        """
-        self._prefix = prefix
-
-    def __repr__(self):
-        pass
-
-
+# todo: prefixes can be duplicated
 class State:
     """ State(in DFA) is a set of 'PureSet'(prefixes).
 

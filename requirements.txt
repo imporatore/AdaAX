@@ -7,3 +7,5 @@ nltk~=3.7
 torchtext~=0.15.2
 ipython~=8.12.0
 graphviz~=2.50.0
+pythomata~=0.3.2
+scipy~=1.10.1

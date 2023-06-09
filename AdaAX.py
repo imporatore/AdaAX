@@ -156,9 +156,9 @@ def merge_states(dfa, state1, state2, inplace=False):
             for s in forward.keys():
                 forward[s] = mapping_[forward[s]]
 
-    # if not inplace:  # Only check consistency when all merging is done
-    #     check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True)
-    check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True)
+    if not inplace:  # Only check consistency when all merging is done
+        check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True)
+    # check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True)
 
     return new_dfa, mapping
 

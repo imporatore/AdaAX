@@ -1,14 +1,17 @@
 import copy
+import argparse
+import os
 
 import numpy as np
 import tqdm
 
-from config import START_PREFIX, TAU, DELTA
+from config import START_PREFIX, K, THETA, TAU, DELTA, DFA_DIR, IMAGE_DIR
 from States_prefixes import build_start_state, build_accept_state
 from DFA_prefixes import DFA
 from Pattern import pattern_extraction, PositivePatternTree
-from utils import d
+from utils import d, RNNLoader
 from Helpers import check_consistency
+from data.utils import save2pickle
 
 
 # todo: if the merging stage is cooperated in the adding stage, would it be faster?
@@ -30,6 +33,8 @@ def add_pattern(dfa, p, h):
     for i, s in enumerate(p[:-1]):
         if s in dfa.delta[q1].keys():
             q1 = dfa.delta[q1][s]
+            if START_PREFIX + p[:i + 1] not in q1.prefixes:
+                q1.prefixes.append(START_PREFIX + p[:i + 1])
         else:
             q1 = dfa.add_new_state(START_PREFIX + p[:i + 1], h[i], prev=q1)
             Q_new.append(q1)
@@ -39,7 +44,7 @@ def add_pattern(dfa, p, h):
     return Q_new
 
 
-def build_dfa(loader, dfa, patterns, merge_start, merge_accept):
+def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
     """ Build DFA using extracted patterns
 
     Args:
@@ -73,12 +78,12 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept):
                     N_t = {s: d(q_t._h, s._h) for s in dfa.Q if s not in (q_t, dfa.F, dfa.q0)}
 
             for s in sorted(N_t.keys(), key=lambda x: N_t[x]):
-                if N_t[s] >= TAU:  # threshold (Euclidean distance of hidden values) for merging states
+                if N_t[s] >= tau:  # threshold (Euclidean distance of hidden values) for merging states
                     break
 
                 new_dfa, _ = merge_states(dfa, q_t, s)  # create the DFA after merging
                 # accept merging if fidelity loss below threshold
-                if dfa.fidelity(loader) - new_dfa.fidelity(loader) < DELTA:
+                if dfa.fidelity(loader) - new_dfa.fidelity(loader) < delta:
                     dfa = new_dfa
                     break
 
@@ -125,7 +130,7 @@ def merge_states(dfa, state1, state2, inplace=False):
     mapping[state1] = mapped_state2
 
     # update entering (state2) transitions
-    prefixes = mapped_state1.prefixes
+    prefixes = mapped_state1.prefixes.copy()
     while prefixes:
         prefix = prefixes.pop()
         s, parent = prefix[-1], new_dfa.prefix2state(prefix[:-1])
@@ -141,42 +146,88 @@ def merge_states(dfa, state1, state2, inplace=False):
 
     # update exiting transitions
     forward = new_dfa.delta.pop(mapped_state1)
-    for s, c in forward.items():
-        child = mapped_state2 if c == mapped_state1 else c  # self-loop
+    for s in forward.keys():
+        if forward[s] == mapped_state1:  # self-loop
+            forward[s] = mapped_state2
+
+    while forward:
+        s, child = forward.popitem()
         if s not in new_dfa.delta[mapped_state2].keys():
             new_dfa.add_transit(mapped_state2, s, child)
         elif new_dfa.delta[mapped_state2][s] != child:
-            new_dfa = merge_states(new_dfa, child, new_dfa.delta[mapped_state2][s], inplace=True)
+            new_dfa, mapping_ = merge_states(new_dfa, child, new_dfa.delta[mapped_state2][s], inplace=True)
 
-    check_consistency(new_dfa, check_transition=False, check_state=True, check_empty=True)
+            # update mapping
+            mapping = {s: mapping_[ns] for s, ns in mapping.items()}
 
-    return new_dfa
+            # update states
+            mapped_state2 = mapping_[mapped_state2]
+            for s in forward.keys():
+                forward[s] = mapping_[forward[s]]
+
+    # if not inplace:  # Only check consistency when all merging is done
+    #     check_consistency(new_dfa, check_transition=False, check_state=True, check_empty=True)
+    # check_consistency(new_dfa, check_transition=False, check_state=True, check_empty=True)
+
+    return new_dfa, mapping
 
 
-def main(rnn_loader, merge_start=True, merge_accept=True, plot=True):
+def main(config):
+
+    # create dfa & image directory
+    if not os.path.exists(config.dfa_dir):
+        os.makedirs(config.dfa_dir)
+    if not os.path.exists(config.image_dir):
+        os.makedirs(config.image_dir)
+
+    loader = RNNLoader(config.fname, config.model)
 
     start_state = build_start_state()
-    start_state._h = start_state.h(rnn_loader)
+    start_state._h = start_state.h(loader)
     accept_state = build_accept_state()
-    accept_state._h = np.mean(rnn_loader.hidden_states[rnn_loader.rnn_output == 1, -1, :], axis=0)
+    accept_state._h = np.mean(loader.hidden_states[loader.rnn_output == 1, -1, :], axis=0)
 
-    dfa = DFA(rnn_loader.alphabet, start_state, accept_state)
+    dfa = DFA(loader.alphabet, start_state, accept_state)
 
-    patterns, support = pattern_extraction(rnn_loader, remove_padding=True)
-    pattern_tree = PositivePatternTree(rnn_loader.prefix_tree)
+    patterns, support = pattern_extraction(
+        loader, cluster_num=config.clusters, pruning=config.pruning, remove_padding=True)
+    pattern_tree = PositivePatternTree(loader.prefix_tree)
     pattern_tree.update_patterns(patterns, support)
 
-    build_dfa(rnn_loader, dfa, pattern_tree, merge_start, merge_accept)
+    build_dfa(loader, dfa, pattern_tree, config.merge_start, config.merge_accept,
+              config.neighbour, config.fidelity_loss)
 
+    save2pickle(config.dfa_dir, dfa, "{}_{}_prefixes".format(config.fname, config.model))
 
-    if plot:
-        dfa.plot()
+    if config.plot:
+        dfa.plot(os.path.join(config.image_path, "{}_{}_prefixes".format(config.fname, config.model)))
 
     return dfa
 
 
 if __name__ == "__main__":
-    from utils import RNNLoader
+    parser = argparse.ArgumentParser()
 
-    loader = RNNLoader('tomita_data_1', 'gru')
-    main(loader)
+    # setup parameters
+    parser.add_argument("--fname", type=str, default="tomita_data_1")
+    parser.add_argument("--model", type=str, default="rnn", choices=["rnn", "lstm", "gru", "glove-lstm"])
+    parser.add_argument("--dfa_dir", type=str, default=DFA_DIR)
+    parser.add_argument("--image_dir", type=str, default=IMAGE_DIR)
+    parser.add_argument("--plot", type=bool, default=True)
+    # parser.add_argument("--start_symbol", type=str, default=START_SYMBOL)
+
+    # pattern parameters
+    parser.add_argument("--clusters", type=int, default=K)
+    parser.add_argument("--pruning", type=float, default=THETA)
+
+    # AdaAX parameters
+    parser.add_argument("--merge_start", type=bool, default=True)
+    parser.add_argument("--merge_accept", type=bool, default=True)
+    parser.add_argument("--neighbour", type=float, default=TAU)
+    parser.add_argument("--fidelity_loss", type=float, default=DELTA)
+
+    args = parser.parse_args()
+
+    print(args)
+
+    main(args)
