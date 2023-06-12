@@ -3,8 +3,8 @@ import os
 import numpy as np
 
 from config import START_PREFIX, TAU, DELTA, DFA_DIR, IMAGE_DIR
-from States import build_start_state, build_accept_state
-from DFA import DFA
+from States_prefixes import build_start_state, build_accept_state
+from DFA_prefixes import DFA
 from Pattern import PatternIterator
 
 
@@ -12,7 +12,7 @@ PATH = r'C:\PycharmProjects\AdaAX\AdaAX-main\synthetic\input.txt'
 
 if __name__ == "__main__":
     from utils import RNNLoader
-    from AdaAX import build_dfa
+    from AdaAX_prefixes import build_dfa
     from data.utils import save2pickle
 
     fname, model = 'synthetic_data_1', 'gru'
@@ -30,8 +30,8 @@ if __name__ == "__main__":
 
     dfa = build_dfa(loader, dfa, patterns_iter, merge_start=True, merge_accept=False, tau=1., delta=0.)
 
-    save2pickle(DFA_DIR, dfa, "{}_{}".format(fname, model))
+    save2pickle(DFA_DIR, dfa, "{}_{}_prefixes".format(fname, model))
 
-    dfa.plot(os.path.join(IMAGE_DIR, "{}_{}".format(fname, model)))
+    dfa.plot(os.path.join(IMAGE_DIR, "{}_{}_prefixes".format(fname, model)))
 
     pass

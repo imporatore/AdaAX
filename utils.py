@@ -177,6 +177,8 @@ def timeit(func):
         start = time.perf_counter()
         result = func(*args, **kwargs)
         end = time.perf_counter()
+        if end - start > 3:
+            pass
         print(f'{func.__name__} took {end - start:.6f} seconds to complete')
         return result
 

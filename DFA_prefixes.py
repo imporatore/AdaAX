@@ -5,7 +5,7 @@ import graphviz as gv
 from pythomata import SimpleDFA  # help trimming, minimizing & plotting
 
 from States_prefixes import State
-from utils import add_nodes, add_edges
+from utils import add_nodes, add_edges, timeit
 from config import START_PREFIX, SEP
 
 # digraph = functools.partial(gv.Digraph, format='png')
@@ -66,11 +66,11 @@ class DFA:
         #     if prefix + [symbol] not in state2.prefixes:
         #         state2.prefixes.append(prefix + [symbol])
 
-    # todo: require testing
-    # todo: as we only extract patterns from positive samples, and DFA entirely built on these patterns
-    # todo: how to deal with missing transitions?
-    # todo: needs modification
     def classify_expression(self, expression):
+        """
+
+        Note: Missing transitions goes to 'sink' state and classified as Negative.
+        """
         # Expression is string with only letters in alphabet
         q = self.q0
         for s in expression[len(START_PREFIX):]:
@@ -79,18 +79,20 @@ class DFA:
             # if not q:  # if no transition found, then expression is not among the extracted patterns
             #     return False
             else:
-                continue
+                # continue
+                return False
             if q == self.F:
                 return True
         # return q == self.F
         # return True
         return False
 
+    @timeit
     def fidelity(self, rnn_loader):
         return rnn_loader.eval_fidelity(self)
 
     # todo: remove the usage of SimpleDFA and implement minimize, complete, trimming
-    def to_simpledfa(self, minimize=True, trim=True):
+    def to_simpledfa(self, minimize, trim):
         alphabet = set(self.alphabet)
         states_mapping = {state: 'state' + str(i + 1) for i, state in enumerate(self.Q)}
         states = set([states_mapping[state] for state in self.Q])
@@ -98,12 +100,12 @@ class DFA:
         accepting_states = {states_mapping[self.F]}
 
         transition_function = {states_mapping[state]: {symbol: states_mapping[
-            s] for symbol, s in self.delta[state].items()} for state in self.delta.keys()}
+            s] for symbol, s in self.delta[state].items()} for state in self.delta.keys()}  # if state != self.F
         dfa = SimpleDFA(states, alphabet, initial_state, accepting_states, transition_function)
-        if minimize:
-            dfa = dfa.minimize()
-        if trim:
-            dfa = dfa.trim()
+        # if minimize:
+        #     dfa = dfa.minimize()
+        # if trim:
+        #     dfa = dfa.trim()
         return dfa
 
     def plot(self, fname, minimize=True, trim=True):
