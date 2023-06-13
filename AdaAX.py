@@ -79,9 +79,9 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
             N_t = {s: d(q_t._h, s._h) for s in dfa.Q if s not in (q_t, dfa.F, dfa.q0)}  # neighbours of q_t
 
             neighbours = sorted(N_t.keys(), key=lambda x: N_t[x])
-            if merge_start and q_t != dfa.q0:
+            if merge_start and q_t not in (dfa.q0, dfa.F):  # start and accepting state shouldn't be merged
                 neighbours = [dfa.q0] + neighbours
-            if merge_accept and q_t != dfa.F:
+            if merge_accept and q_t not in (dfa.q0, dfa.F):
                 neighbours = [dfa.F] + neighbours
 
             for s in neighbours:
@@ -89,13 +89,14 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
                     break
 
                 new_dfa, _ = merge_states(dfa, q_t, s)  # create the DFA after merging
-                new_dfa_fidelity = new_dfa.fidelity(loader)
-                # accept merging if fidelity loss below threshold
-                if dfa_fidelity - new_dfa_fidelity <= delta:
-                    print("Merged: dfa fidelity {}; new dfa fidelity {}".format(dfa_fidelity, new_dfa_fidelity))
-                    dfa, dfa_fidelity = new_dfa, new_dfa_fidelity
 
-                    break
+                if len(new_dfa.Q) > 1:
+                    new_dfa_fidelity = new_dfa.fidelity(loader)
+                    # accept merging if fidelity loss below threshold
+                    if dfa_fidelity - new_dfa_fidelity <= delta:
+                        print("Merged: dfa fidelity %f; new dfa fidelity %f" % (dfa_fidelity, new_dfa_fidelity))
+                        dfa, dfa_fidelity = new_dfa, new_dfa_fidelity
+                        break
 
         print("Pattern %d, current fidelity: %f" % (i + 1, dfa_fidelity))
 
@@ -176,9 +177,12 @@ def merge_states(dfa, state1, state2, inplace=False):
                 for s in forward.keys():
                     forward[s] = mapping_[forward[s]]
 
+    if new_dfa.F in new_dfa.delta.keys():
+        new_dfa.delta.delete_forward(new_dfa.F)
+
     if not inplace:  # Only check consistency when all merging is done
-        check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True)
-    # check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True)
+        check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True)
+    # check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True)
 
     return new_dfa, mapping
 

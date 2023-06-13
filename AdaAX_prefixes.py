@@ -57,8 +57,14 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
         TAU: threshold for neighbour distance
         DELTA: threshold for merging fidelity loss
     """
+
+    dfa_fidelity = dfa.fidelity(loader)
+
     for i, res in enumerate(tqdm.tqdm(patterns)):
         p, h, _ = res  # (pattern, hidden, support)
+
+        if i == 26:
+            pass
 
         # list of new states created by pattern
         # if START_SYMBOL, first symbol in pattern is START_SYMBOL
@@ -70,8 +76,6 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
             print("Pattern %d already accepted. Pass." % (i + 1))
             continue
 
-        dfa_fidelity = dfa.fidelity(loader)
-
         while dfa.A_t:
 
             assert all([st in dfa.Q for st in dfa.A_t])  # todo: test
@@ -81,22 +85,24 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
             N_t = {s: d(q_t._h, s._h) for s in dfa.Q if s not in (q_t, dfa.F, dfa.q0)}  # neighbours of q_t
 
             neighbours = sorted(N_t.keys(), key=lambda x: N_t[x])
-            if merge_start and q_t != dfa.q0:
+            if merge_start and q_t not in (dfa.q0, dfa.F):  # start and accepting state shouldn't be merged
                 neighbours = [dfa.q0] + neighbours
-            if merge_accept and q_t != dfa.F:
+            if merge_accept and q_t not in (dfa.q0, dfa.F):
                 neighbours = [dfa.F] + neighbours
 
             for s in neighbours:
                 if N_t.get(s, 0) >= tau:  # threshold (Euclidean distance of hidden values) for merging states
                     break
+                try:
+                    new_dfa, _ = merge_states(dfa, q_t, s)  # create the DFA after merging
+                except RuntimeError:
+                    continue
 
-                new_dfa, _ = merge_states(dfa, q_t, s)  # create the DFA after merging
                 new_dfa_fidelity = new_dfa.fidelity(loader)
                 # accept merging if fidelity loss below threshold
                 if dfa_fidelity - new_dfa_fidelity <= delta:
-                    print("Merged: dfa fidelity {}; new dfa fidelity {}".format(dfa_fidelity, new_dfa_fidelity))
+                    print("Merged: dfa fidelity %f; new dfa fidelity %f" % (dfa_fidelity, new_dfa_fidelity))
                     dfa, dfa_fidelity = new_dfa, new_dfa_fidelity
-
                     break
 
         print("Pattern %d, current fidelity: %f" % (i + 1, dfa_fidelity))
@@ -126,12 +132,14 @@ def merge_states(dfa, state1, state2, inplace=False):
     mapped_state1, mapped_state2 = mapping[state1], mapping[state2]
 
     # todo: check if start & accept state would be merged
-    # start & accepting state will never be state1 (the state to be merged)
     # Update start and accept states if merged.
     if state1 == dfa.q0:
         new_dfa.q0 = mapped_state2
     elif state1 == dfa.F:
         new_dfa.F = mapped_state2
+
+    if new_dfa.q0 == new_dfa.F:
+        raise RuntimeError("Start state & accepting state merged. Quit merging.")
 
     # update to-merge list
     if state1 in dfa.A_t:
@@ -153,6 +161,12 @@ def merge_states(dfa, state1, state2, inplace=False):
         prefix = prefixes.pop()
         if prefix == START_PREFIX:
             continue
+
+        # try:
+        #     s, parent = prefix[-1], new_dfa.prefix2state(prefix[:-1])
+        # except ValueError:  # todo: examine if this only occurs when prefix exceeds accepting state
+        #     # in this case, no forward transitions should be added since accepting state already reached
+        #     continue
 
         s, parent = prefix[-1], new_dfa.prefix2state(prefix[:-1])
         if parent == mapped_state1:  # todo: note that this is a self loop and may encounter conflict for exiting transitions
@@ -190,9 +204,14 @@ def merge_states(dfa, state1, state2, inplace=False):
                 for s in forward.keys():
                     forward[s] = mapping_[forward[s]]
 
+    if new_dfa.F in new_dfa.delta.keys():
+        del new_dfa.delta[new_dfa.F]
+        # also have to delete prefixes which are unreachable (beyond the accepting state)
+
     # if not inplace:  # Only check consistency when all merging is done
-    #     check_consistency(new_dfa, check_transition=False, check_state=True, check_empty=True)
-    # check_consistency(new_dfa, check_transition=False, check_state=True, check_empty=True)
+    #     check_consistency(new_dfa, check_transition=False, check_state=True, check_empty=True, check_null_states=True)
+    # check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True)
+    new_dfa._check_null_states()
 
     return new_dfa, mapping
 

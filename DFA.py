@@ -7,6 +7,7 @@ from States import State
 from Transition import TransitionTable
 from utils import add_nodes, add_edges, timeit
 from config import START_PREFIX, SEP
+from Fidelity import parse_tree_with_dfa
 
 # digraph = functools.partial(gv.Digraph, format='png')
 # graph = functools.partial(gv.Graph, format='png')
@@ -73,7 +74,28 @@ class DFA:
 
     @timeit
     def fidelity(self, rnn_loader):
-        return rnn_loader.eval_fidelity(self)
+        mapping, missing = parse_tree_with_dfa(rnn_loader.prefix_tree.root, self.q0, self)
+        accepted_sup = sum([node.sup for node in mapping[self.F]])
+        # assert abs(rnn_loader.prefix_tree.fidelity(accepted_sup) - rnn_loader.eval_fidelity(self)) < 1e-6
+        return rnn_loader.prefix_tree.fidelity(accepted_sup)
+        # return rnn_loader.eval_fidelity(self)
+
+    def _check_null_states(self):
+        reachable_states = {self.q0}
+        for state in self.delta.keys():
+            reachable_states.update(self.delta[state].values())
+        for state in self.Q:
+            if state not in reachable_states:
+                if state == self.F:
+                    raise RuntimeError("Accepting state unreachable.")
+                else:
+                    self.delta.pop(state)  # Remove unreachable state in dfa
+                    self.Q.remove(state)
+                    try:
+                        if state in self.A_t:
+                            self.A_t.remove(state)  # Remove in "states to be merged" queue for consistency
+                    except AttributeError:
+                        pass
 
     # todo: remove the usage of SimpleDFA and implement minimize, complete, trimming
     def to_simpledfa(self, minimize, trim):

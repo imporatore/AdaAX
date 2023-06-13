@@ -7,6 +7,8 @@ from pythomata import SimpleDFA  # help trimming, minimizing & plotting
 from States_prefixes import State
 from utils import add_nodes, add_edges, timeit
 from config import START_PREFIX, SEP
+from Fidelity import parse_tree_with_dfa
+
 
 # digraph = functools.partial(gv.Digraph, format='png')
 # graph = functools.partial(gv.Graph, format='png')
@@ -32,7 +34,7 @@ class DFA:
         """ Return the state in DFA for prefix.
 
         Note: We should use prefixes to index instead of parsing transition table as when this prefix2state is called,
-            the transition table hadn't update."""
+            the transition table hadn't updated."""
         for state in self.Q:
             if prefix in state.prefixes:
                 return state
@@ -76,20 +78,57 @@ class DFA:
         for s in expression[len(START_PREFIX):]:
             if s in self.delta[q].keys():
                 q = self.delta[q][s]
-            # if not q:  # if no transition found, then expression is not among the extracted patterns
-            #     return False
-            else:
-                # continue
+            else:  # if no transition found, then expression is not among the extracted patterns
                 return False
             if q == self.F:
                 return True
-        # return q == self.F
-        # return True
         return False
 
     @timeit
     def fidelity(self, rnn_loader):
-        return rnn_loader.eval_fidelity(self)
+        mapping, missing = parse_tree_with_dfa(rnn_loader.prefix_tree.root, self.q0, self)
+        accepted_sup = sum([node.sup for node in mapping[self.F]])
+        # assert abs(rnn_loader.prefix_tree.fidelity(accepted_sup) - rnn_loader.eval_fidelity(self)) < 1e-6
+        return rnn_loader.prefix_tree.fidelity(accepted_sup)
+        # return rnn_loader.eval_fidelity(self)
+
+    def _check_null_states(self):
+        reachable_states = {self.q0}
+        for state in self.delta.keys():
+            reachable_states.update(self.delta[state].values())
+        for state in self.Q:
+            if state not in reachable_states:
+                if state == self.F:
+                    raise RuntimeError("Accepting state unreachable.")
+                else:
+                    self.Q.remove(state)  # Remove unreachable state in dfa
+                    for prefix in state.prefixes:
+                        self._delete_prefix(state, prefix)
+                    if state in self.delta.keys():
+                        del self.delta[state]
+
+                    try:
+                        if state in self.A_t:
+                            self.A_t.remove(state)  # Remove in "states to be merged" queue for consistency
+                    except AttributeError:
+                        pass
+
+    def _delete_prefix(self, state, prefix):
+        """ Delete a prefix of a given state.
+
+        Remove all children from this prefix."""
+        if prefix not in state.prefixes:
+            raise ValueError("Prefix %s doesn't belong to state." % prefix)
+        stack = [(state, prefix)]
+        while stack:
+            state_, prefix_ = stack.pop()
+            state_.prefixes.remove(prefix_)
+
+            if state_ in self.delta.keys():
+                for s in self.delta[state_].keys():
+                    child = self.delta[state_][s]
+                    if prefix_ + [s] in child.prefixes:
+                        stack.append((child, prefix_ + [s]))
 
     # todo: remove the usage of SimpleDFA and implement minimize, complete, trimming
     def to_simpledfa(self, minimize, trim):
@@ -102,10 +141,12 @@ class DFA:
         transition_function = {states_mapping[state]: {symbol: states_mapping[
             s] for symbol, s in self.delta[state].items()} for state in self.delta.keys()}  # if state != self.F
         dfa = SimpleDFA(states, alphabet, initial_state, accepting_states, transition_function)
+
         # if minimize:
         #     dfa = dfa.minimize()
         # if trim:
         #     dfa = dfa.trim()
+
         return dfa
 
     def plot(self, fname, minimize=True, trim=True):
