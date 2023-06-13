@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     patterns = [START_PREFIX + expr.split(',')[1:-1] for expr in open(PATH, 'r')]
     # Line 79 ~ Line 83 in input.txt is not a positive pattern
-    patterns_iter = PatternIterator(loader.prefix_tree, patterns[:66])
+    patterns_iter = PatternIterator(loader.prefix_tree, patterns)
 
     dfa = build_dfa(loader, dfa, patterns_iter, merge_start=True, merge_accept=False, tau=1., delta=0.)
 

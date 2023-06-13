@@ -5,7 +5,7 @@ from config import START_SYMBOL, START_PREFIX
 
 class SymbolNode4Support(object):
 
-    def __init__(self, val, ):
+    def __init__(self, val):
         self.val = val  # Symbol in the alphabet
         self.next = []
         self.pos_sup = 0
@@ -20,17 +20,10 @@ class SymbolNode4Support(object):
 
 class PrefixTree4Support:
 
-    def __init__(self, seq, hidden, label, class_balanced):
+    def __init__(self, seq, hidden, label):
         self.root = SymbolNode4Support(START_SYMBOL)
         self.root.h = hidden[0, 0, :]  # hidden values for start symbol
-
-        pos_counts, neg_counts = sum(label), len(label) - sum(label)
-        self._pos_weight = 1 / (2 * pos_counts) if class_balanced else 1 / len(label)
-        self._neg_weight = 1 / (2 * neg_counts) if class_balanced else 1 / len(label)
-
-        # Note that all expressions which is not accepted is classified as negative.
-        self.fidelity = lambda accepted_sup: accepted_sup + neg_counts * self._neg_weight
-
+        self._pos_weight, self._neg_weight = 1 / len(label), 1 / len(label)
         self._build_tree(seq, hidden, label)
 
     def _build_tree(self, seq, hidden, label):
@@ -60,6 +53,9 @@ class PrefixTree4Support:
             else:
                 cur.neg_sup += self._neg_weight
 
+            if l and (i == len(s) - 1 or s[i + 1] == '<PAD>'):  # reached the end of a positive sample
+                cur._pos_pat = True
+
     def eval_hidden(self, expr):
         cur = self.root
         for symbol in expr:
@@ -67,6 +63,32 @@ class PrefixTree4Support:
                 if n.val == symbol:
                     cur = n
         return cur.h
+
+    def __iter__(self):
+        """ Parse the tree using DFS.
+
+        Only yield positive samples in rnn result.
+
+        *** Bad performance ***
+
+        Note:
+            No pattern is another pattern's prefix.
+
+        Return:
+            expr: list, list of symbols, positive patterns
+            h: list, list of hidden values in expr
+            sup: tuple(float, float), positive and negative support of the pattern
+        """
+        stack = [(self.root, [self.root.val], [self.root.h])]
+        while stack:
+            node, expr, hidden = stack.pop()
+            try:
+                if node._pos_pat:
+                    yield expr, hidden, (node.pos_sup, node.neg_sup)
+            except AttributeError:
+                for n in node.next:
+                    if n.val != '<PAD>':
+                        stack.append((n, expr + [n.val], hidden + [n.h]))
 
 
 def parse_tree_with_dfa(node, state, dfa):

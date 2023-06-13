@@ -109,8 +109,7 @@ class RNNLoader:
         self.decoded_input_seq = np.array([self.decode(
             seq, remove_padding=False, as_list=True) for seq in self.input_sequences])
         # self.prefix_tree = PrefixTree(self.decoded_input_seq, self.hidden_states)
-        self.prefix_tree = PrefixTree4Support(self.decoded_input_seq, self.hidden_states,
-                                              self.rnn_output, class_balanced=False)
+        self.prefix_tree = PrefixTree4Support(self.decoded_input_seq, self.hidden_states, self.rnn_output)
 
     # The hidden value in the RNN for given prefix
     # todo: Accelerate by using cashed hidden states

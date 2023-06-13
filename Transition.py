@@ -210,25 +210,40 @@ class TransitionTable:  # todo: __new__
 
     def _check_empty_transition(self):
         """ Check if empty transition exists."""
+        to_delete_forward_transitions, to_delete_backward_transitions = [], []
+        to_delete_forward_states, to_delete_backward_states = [], []
+
         for state in self.forward.keys():
             for s in self.forward[state].keys():
                 if self.forward[state][s] is None:
                     warnings.warn("Empty transition found in forward table.")
-                    del self.forward[state][s]
+                    to_delete_forward_transitions.append((state, s))
 
             if len(self.forward[state]) == 0:
                 warnings.warn("Empty forward transition table found.")
-                del self.forward[state]
+                to_delete_forward_states.append(state)
+
+        for state, s in to_delete_forward_transitions:
+            del self.forward[state][s]
+
+        for state in to_delete_forward_states:
+            del self.forward[state]
 
         for state in self.backward.keys():
             for s in self.backward[state].keys():
                 if not self.backward[state][s]:
                     warnings.warn("Empty transition found in backward table.")
-                    del self.backward[state][s]
+                    to_delete_backward_transitions.append((state, s))
 
             if len(self.backward[state]) == 0:
                 warnings.warn("Empty backward transition table found.")
-                del self.backward[state]
+                to_delete_backward_states.append(state)
+
+        for state, s in to_delete_backward_transitions:
+            del self.backward[state][s]
+
+        for state in to_delete_backward_states:
+            del self.backward[state]
 
 
 if __name__ == '__main__':

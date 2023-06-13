@@ -6,10 +6,10 @@ from collections import deque
 import numpy as np
 import tqdm
 
-from config import START_PREFIX, K, THETA, TAU, DELTA, DFA_DIR, IMAGE_DIR
+from config import START_PREFIX, K, THETA, POS_THRESHOLD, TAU, DELTA, DFA_DIR, IMAGE_DIR
 from States_prefixes import build_start_state, build_accept_state
 from DFA_prefixes import DFA
-from Pattern import pattern_extraction, PositivePatternTree
+from Pattern import pattern_extraction, PositivePatternTree, PatternSampler
 from utils import d, RNNLoader
 from Helpers import check_consistency
 from data.utils import save2pickle
@@ -27,24 +27,25 @@ def add_pattern(dfa, p, h):
     Returns:
         Q_new: list, new states (pure sets) added by the pattern
     """
-    q1 = dfa.q0
+    new_dfa = copy.deepcopy(dfa)
+    q1 = new_dfa.q0
     Q_new = deque()  # New pure sets to add
 
     # new state shouldn't be created for the last symbol in a pattern, since it is the accept state
     for i, s in enumerate(p[:-1]):
-        if s in dfa.delta[q1].keys():
-            q1 = dfa.delta[q1][s]
+        if s in new_dfa.delta[q1].keys():
+            q1 = new_dfa.delta[q1][s]
             if START_PREFIX + p[:i + 1] not in q1.prefixes:
                 q1.prefixes.append(START_PREFIX + p[:i + 1])
-            if q1 == dfa.F:
-                return Q_new
+            if q1 == new_dfa.F:
+                return new_dfa, Q_new
         else:
-            q1 = dfa.add_new_state(START_PREFIX + p[:i + 1], h[i], prev=q1)
+            q1 = new_dfa.add_new_state(START_PREFIX + p[:i + 1], h[i], prev=q1)
             Q_new.append(q1)
 
-    dfa.add_transit(q1, p[-1], dfa.F)  # add transition of the last symbol to accept state
-    dfa.F.prefixes.append(START_PREFIX + p)
-    return Q_new
+    new_dfa.add_transit(q1, p[-1], new_dfa.F)  # add transition of the last symbol to accept state
+    new_dfa.F.prefixes.append(START_PREFIX + p)
+    return new_dfa, Q_new
 
 
 def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
@@ -56,6 +57,11 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
     Params:
         TAU: threshold for neighbour distance
         DELTA: threshold for merging fidelity loss
+
+    Note:
+        set merge_accept to True would cause bad behavior (both slow & low fidelity) for some dataset,
+        e.g., synthetic 1
+            - it seems that, after added check pattern, this problem resolves
     """
 
     dfa_fidelity = dfa.fidelity(loader)
@@ -63,18 +69,22 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
     for i, res in enumerate(tqdm.tqdm(patterns)):
         p, h, _ = res  # (pattern, hidden, support)
 
-        if i == 26:
-            pass
-
         # list of new states created by pattern
         # if START_SYMBOL, first symbol in pattern is START_SYMBOL
         # A_t is modified as a private attribute of dfa so that it can be mapped while deepcopy,
         # or I would have to write explicit mapping dict.
-        dfa.A_t = add_pattern(dfa, p[len(START_PREFIX):], h[len(START_PREFIX):])
+        new_dfa, states_to_be_merged = add_pattern(dfa, p[len(START_PREFIX):], h[len(START_PREFIX):])
 
-        if not dfa.A_t:
-            print("Pattern %d already accepted. Pass." % (i + 1))
+        if not states_to_be_merged:
+            # print("Pattern %d already accepted. Pass." % (i + 1))
             continue
+        else:
+            new_dfa_fidelity = new_dfa.fidelity(loader)
+            if new_dfa_fidelity >= dfa_fidelity:
+                dfa, dfa_fidelity, dfa.A_t = new_dfa, new_dfa_fidelity, states_to_be_merged
+            else:
+                print("Pattern %s unaccepted." % p)
+                continue
 
         while dfa.A_t:
 
@@ -95,7 +105,7 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
                     break
                 try:
                     new_dfa, _ = merge_states(dfa, q_t, s)  # create the DFA after merging
-                except RuntimeError:
+                except RuntimeError:  # Start state & accepting state merged
                     continue
 
                 new_dfa_fidelity = new_dfa.fidelity(loader)
@@ -225,6 +235,7 @@ def main(config):
         os.makedirs(config.image_dir)
 
     loader = RNNLoader(config.fname, config.model)
+    pattern_sampler = PatternSampler(loader.prefix_tree, pos_threshold=config.pos_threshold)
 
     start_state = build_start_state()
     start_state._h = start_state.h(loader)
@@ -233,18 +244,21 @@ def main(config):
 
     dfa = DFA(loader.alphabet, start_state, accept_state)
 
-    patterns, support = pattern_extraction(
-        loader, cluster_num=config.clusters, pruning=config.pruning, remove_padding=True)
-    pattern_tree = PositivePatternTree(loader.prefix_tree)
-    pattern_tree.update_patterns(patterns, support)
+    # patterns, support = pattern_extraction(
+    #     loader, cluster_num=config.clusters, pruning=config.pruning, remove_padding=True)
+    # pattern_tree = PositivePatternTree(loader.prefix_tree)
+    # pattern_tree.update_patterns(patterns, support)
+    #
+    # dfa = build_dfa(loader, dfa, pattern_tree, config.merge_start, config.merge_accept,
+    #                 config.neighbour, config.fidelity_loss)
 
-    dfa = build_dfa(loader, dfa, pattern_tree, config.merge_start, config.merge_accept,
+    dfa = build_dfa(loader, dfa, pattern_sampler, config.merge_start, config.merge_accept,
                     config.neighbour, config.fidelity_loss)
 
     save2pickle(config.dfa_dir, dfa, "{}_{}_prefixes".format(config.fname, config.model))
 
     if config.plot:
-        dfa.plot(os.path.join(config.image_path, "{}_{}_prefixes".format(config.fname, config.model)))
+        dfa.plot(os.path.join(config.image_dir, "{}_{}_prefixes".format(config.fname, config.model)))
 
     return dfa
 
@@ -253,8 +267,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # setup parameters
-    parser.add_argument("--fname", type=str, default="tomita_data_1")
-    parser.add_argument("--model", type=str, default="rnn", choices=["rnn", "lstm", "gru", "glove-lstm"])
+    parser.add_argument("--fname", type=str)
+    parser.add_argument("--model", type=str, choices=["rnn", "lstm", "gru", "glove-lstm"])
     parser.add_argument("--dfa_dir", type=str, default=DFA_DIR)
     parser.add_argument("--image_dir", type=str, default=IMAGE_DIR)
     parser.add_argument("--plot", type=bool, default=True)
@@ -263,6 +277,7 @@ if __name__ == "__main__":
     # pattern parameters
     parser.add_argument("--clusters", type=int, default=K)
     parser.add_argument("--pruning", type=float, default=THETA)
+    parser.add_argument("--pos_threshold", type=float, default=POS_THRESHOLD)
 
     # AdaAX parameters
     parser.add_argument("--merge_start", type=bool, default=True)

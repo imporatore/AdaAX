@@ -1,4 +1,4 @@
-from config import DFA_DIR, IMAGE_DIR, K, THETA, TAU, DELTA
+from config import DFA_DIR, IMAGE_DIR, K, THETA, POS_THRESHOLD, TAU, DELTA
 from utils import ConfigDict
 from AdaAX import main
 
@@ -6,45 +6,43 @@ from AdaAX import main
 DEFAULT_CONFIG = {"dfa_dir": DFA_DIR,
                   "image_dir": IMAGE_DIR,
                   # "start_symbol": START_SYMBOL,
-                  "plot": True}
+                  "plot": True,
+                  "merge_start": True,
+                  "merge_accept": False
+                  }
 
 synthetic1_config = {"fname": "synthetic_data_1",
                      "clusters": K,
                      "pruning": THETA,
-                     "merge_start": True,
-                     "merge_accept": True,
-                     "neighbour": TAU,
-                     "fidelity_loss": DELTA}
+                     "pos_threshold": .95,
+                     "neighbour": 1.,
+                     "fidelity_loss": 0.}
 
 synthetic2_config = {"fname": "synthetic_data_2",
                      "clusters": K,
                      "pruning": THETA,
-                     "merge_start": True,
-                     "merge_accept": True,
+                     "pos_threshold": POS_THRESHOLD,
                      "neighbour": TAU,
                      "fidelity_loss": DELTA}
 
 tomita1_config = {"fname": "tomita_data_1",
                   "clusters": K,
                   "pruning": THETA,
-                  "merge_start": True,
-                  "merge_accept": True,
+                  "pos_threshold": POS_THRESHOLD,
                   "neighbour": TAU,
                   "fidelity_loss": DELTA}
 
 tomita2_config = {"fname": "tomita_data_2",
                   "clusters": K,
                   "pruning": THETA,
-                  "merge_start": True,
-                  "merge_accept": True,
+                  "pos_threshold": POS_THRESHOLD,
                   "neighbour": TAU,
                   "fidelity_loss": DELTA}
 
 yelp_config = {"fname": "yelp_review_balanced",
                "clusters": K,
                "pruning": THETA,
-               "merge_start": True,
-               "merge_accept": True,
+               "pos_threshold": POS_THRESHOLD,
                "neighbour": TAU,
                "fidelity_loss": DELTA}
 

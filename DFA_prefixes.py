@@ -84,12 +84,31 @@ class DFA:
                 return True
         return False
 
-    @timeit
-    def fidelity(self, rnn_loader):
+    # @timeit
+    def fidelity(self, rnn_loader, class_balanced=False):
+        """
+        Note:
+            set class_balanced to true may cause great misbehavior of AdaAX.
+
+            For example, linking start and accepting state with '1' would cause magnificent fidelity loss,
+                as most examples, including those which started with '1' are negative samples.
+
+                However, when class_balanced=True, those positive samples are over-weighted to
+                (total_samples) / (2 * positive_samples), thus may not result in fidelity loss for this misbehavior.
+        """
+        # Note that all expressions which is not accepted is classified as negative.
+        pos_count, total_count = sum(rnn_loader.rnn_output), len(rnn_loader.rnn_output)
+        neg_count = total_count - pos_count
+
         mapping, missing = parse_tree_with_dfa(rnn_loader.prefix_tree.root, self.q0, self)
-        accepted_sup = sum([node.sup for node in mapping[self.F]])
+        accepted_pos = sum([node.pos_sup for node in mapping[self.F]])
+        accepted_neg = sum([node.neg_sup for node in mapping[self.F]])
+
+        if not class_balanced:
+            return accepted_pos - accepted_neg + neg_count / total_count
+        else:
+            return total_count * accepted_pos / (2 * pos_count) - total_count * accepted_neg / (2 * neg_count) + .5
         # assert abs(rnn_loader.prefix_tree.fidelity(accepted_sup) - rnn_loader.eval_fidelity(self)) < 1e-6
-        return rnn_loader.prefix_tree.fidelity(accepted_sup)
         # return rnn_loader.eval_fidelity(self)
 
     def _check_null_states(self):
