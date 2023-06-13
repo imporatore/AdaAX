@@ -1,4 +1,5 @@
 import warnings
+from collections import deque
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -221,6 +222,41 @@ class PatternIterator:
                     break
             if len(hidden) == len(pattern):
                 yield pattern, hidden, support
+
+
+class PatternSampler:
+
+    def __init__(self, prefix_tree, pos_threshold):
+        """
+        Args:
+            pos_threshold: float, threshold for positive patterns, default 0.95,
+                i.e. (pos_sup / (pos_sup + neg_sup)) > pos_threshold
+                - should be adjusted for unbalanced dataset
+        """
+        self.root = prefix_tree.root
+        self.threshold = pos_threshold
+
+    def __iter__(self):
+        """ Parse the tree using BFS (so that simpler/shorter patterns come first)
+
+        Idea:
+            use numeric values for sorting: score = f(length, pos_prop)
+                - score \propto 1 / length
+                - score \propto pos_prop
+                i.e. score := length * log(pos_prop)
+                    - require Laplace smoothing
+        """
+        queue = deque([(self.root, [self.root.val], [self.root.h])])
+        while queue:
+            node, expr, hidden = queue.popleft()
+
+            if node.pos_sup / (node.pos_sup + node.neg_sup) >= self.threshold:
+                yield expr, hidden, (node.pos_sup, node.neg_sup)
+
+            else:
+                for n in node.next:
+                    if n.val != '<PAD>':
+                        queue.append((n, expr + [n.val], hidden + [n.h]))
 
 
 if __name__ == "__main__":

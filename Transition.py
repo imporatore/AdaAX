@@ -1,5 +1,5 @@
-import copy
 from collections import defaultdict
+import warnings
 
 
 class WrappedDict:
@@ -157,7 +157,7 @@ class TransitionTable:  # todo: __new__
 
         # remove exiting transition in backward dict
         for symbol, state in forward_transition.items():
-            if state != item:  # self-loop
+            if state != item:  # self-loop, backward transition already popped
                 self.backward[state][symbol].remove(item)
                 if not self.backward[state][symbol]:
                     del self.backward[state][symbol]
@@ -165,6 +165,17 @@ class TransitionTable:  # todo: __new__
                         del self.backward[state]
 
         return forward_transition.todict(), backward_transition.todict()
+
+    def delete_forward(self, item):
+        forward_transition = self.forward.pop(item)
+
+        # remove exiting transition in backward dict
+        for symbol, state in forward_transition.items():
+            self.backward[state][symbol].remove(item)
+            if not self.backward[state][symbol]:
+                del self.backward[state][symbol]
+                if not self.backward[state]:
+                    del self.backward[state]
 
     def _check_transition_consistency(self):
         """ Check consistency of forward and backward transitions."""
@@ -187,9 +198,11 @@ class TransitionTable:  # todo: __new__
         """ Check if the states in transition table are consistent with given states."""
         assert all([s in states for s in self.forward.keys()]), "Forward table has unidentified parent state."
         assert all([s in states for s in self.backward.keys()]), "Backward table has unidentified child state."
+
         for state in self.forward.keys():
             assert all([s in states for s in self.forward[state].values()]), \
                 "Forward table has unidentified child state."
+
         for state in self.backward.keys():
             for symbol in self.backward[state].keys():
                 assert all([s in states for s in self.backward[state][symbol]]), \
@@ -197,16 +210,45 @@ class TransitionTable:  # todo: __new__
 
     def _check_empty_transition(self):
         """ Check if empty transition exists."""
+        to_delete_forward_transitions, to_delete_backward_transitions = [], []
+        to_delete_forward_states, to_delete_backward_states = [], []
+
         for state in self.forward.keys():
-            assert not any([s is None for s in self.forward[state].values()]), \
-                "Empty transition found in forward table."
+            for s in self.forward[state].keys():
+                if self.forward[state][s] is None:
+                    warnings.warn("Empty transition found in forward table.")
+                    to_delete_forward_transitions.append((state, s))
+
+            if len(self.forward[state]) == 0:
+                warnings.warn("Empty forward transition table found.")
+                to_delete_forward_states.append(state)
+
+        for state, s in to_delete_forward_transitions:
+            del self.forward[state][s]
+
+        for state in to_delete_forward_states:
+            del self.forward[state]
+
         for state in self.backward.keys():
-            assert not any([s == [] for s in self.forward[state].values()]), \
-                "Empty transition found in backward table."
+            for s in self.backward[state].keys():
+                if not self.backward[state][s]:
+                    warnings.warn("Empty transition found in backward table.")
+                    to_delete_backward_transitions.append((state, s))
+
+            if len(self.backward[state]) == 0:
+                warnings.warn("Empty backward transition table found.")
+                to_delete_backward_states.append(state)
+
+        for state, s in to_delete_backward_transitions:
+            del self.backward[state][s]
+
+        for state in to_delete_backward_states:
+            del self.backward[state]
 
 
 if __name__ == '__main__':
     import random
+    import copy
 
     delta = TransitionTable()
     delta[1]['a'] = 2

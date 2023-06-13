@@ -36,8 +36,11 @@ START_PREFIX = [START_SYMBOL] if START_SYMBOL else []
 K = 10  # Initial cluster numbers, determined by elbow method
 # THETA = 0.005  # Threshold for pruning
 THETA = 0.
+POS_THRESHOLD = .95  # threshold for an expression be considered a positive pattern
 TAU = 1.  # Threshold for neighbour distance
-DELTA = 0.001  # Threshold for merging fidelity loss
+# TAU = 3.
+# DELTA = 0.001  # Threshold for merging fidelity loss
+DELTA = 0.0001
 
 # Plot
 SEP = ", "

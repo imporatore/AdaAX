@@ -5,8 +5,10 @@ import graphviz as gv
 from pythomata import SimpleDFA  # help trimming, minimizing & plotting
 
 from States_prefixes import State
-from utils import add_nodes, add_edges
+from utils import add_nodes, add_edges, timeit
 from config import START_PREFIX, SEP
+from Fidelity import parse_tree_with_dfa
+
 
 # digraph = functools.partial(gv.Digraph, format='png')
 # graph = functools.partial(gv.Graph, format='png')
@@ -32,7 +34,7 @@ class DFA:
         """ Return the state in DFA for prefix.
 
         Note: We should use prefixes to index instead of parsing transition table as when this prefix2state is called,
-            the transition table hadn't update."""
+            the transition table hadn't updated."""
         for state in self.Q:
             if prefix in state.prefixes:
                 return state
@@ -66,31 +68,89 @@ class DFA:
         #     if prefix + [symbol] not in state2.prefixes:
         #         state2.prefixes.append(prefix + [symbol])
 
-    # todo: require testing
-    # todo: as we only extract patterns from positive samples, and DFA entirely built on these patterns
-    # todo: how to deal with missing transitions?
-    # todo: needs modification
     def classify_expression(self, expression):
+        """
+
+        Note: Missing transitions goes to 'sink' state and classified as Negative.
+        """
         # Expression is string with only letters in alphabet
         q = self.q0
         for s in expression[len(START_PREFIX):]:
             if s in self.delta[q].keys():
                 q = self.delta[q][s]
-            # if not q:  # if no transition found, then expression is not among the extracted patterns
-            #     return False
-            else:
-                continue
+            else:  # if no transition found, then expression is not among the extracted patterns
+                return False
             if q == self.F:
                 return True
-        # return q == self.F
-        # return True
         return False
 
-    def fidelity(self, rnn_loader):
-        return rnn_loader.eval_fidelity(self)
+    # @timeit
+    def fidelity(self, rnn_loader, class_balanced=False):
+        """
+        Note:
+            set class_balanced to true may cause great misbehavior of AdaAX.
+
+            For example, linking start and accepting state with '1' would cause magnificent fidelity loss,
+                as most examples, including those which started with '1' are negative samples.
+
+                However, when class_balanced=True, those positive samples are over-weighted to
+                (total_samples) / (2 * positive_samples), thus may not result in fidelity loss for this misbehavior.
+        """
+        # Note that all expressions which is not accepted is classified as negative.
+        pos_count, total_count = sum(rnn_loader.rnn_output), len(rnn_loader.rnn_output)
+        neg_count = total_count - pos_count
+
+        mapping, missing = parse_tree_with_dfa(rnn_loader.prefix_tree.root, self.q0, self)
+        accepted_pos = sum([node.pos_sup for node in mapping[self.F]])
+        accepted_neg = sum([node.neg_sup for node in mapping[self.F]])
+
+        if not class_balanced:
+            return accepted_pos - accepted_neg + neg_count / total_count
+        else:
+            return total_count * accepted_pos / (2 * pos_count) - total_count * accepted_neg / (2 * neg_count) + .5
+        # assert abs(rnn_loader.prefix_tree.fidelity(accepted_sup) - rnn_loader.eval_fidelity(self)) < 1e-6
+        # return rnn_loader.eval_fidelity(self)
+
+    def _check_null_states(self):
+        reachable_states = {self.q0}
+        for state in self.delta.keys():
+            reachable_states.update(self.delta[state].values())
+        for state in self.Q:
+            if state not in reachable_states:
+                if state == self.F:
+                    raise RuntimeError("Accepting state unreachable.")
+                else:
+                    self.Q.remove(state)  # Remove unreachable state in dfa
+                    for prefix in state.prefixes:
+                        self._delete_prefix(state, prefix)
+                    if state in self.delta.keys():
+                        del self.delta[state]
+
+                    try:
+                        if state in self.A_t:
+                            self.A_t.remove(state)  # Remove in "states to be merged" queue for consistency
+                    except AttributeError:
+                        pass
+
+    def _delete_prefix(self, state, prefix):
+        """ Delete a prefix of a given state.
+
+        Remove all children from this prefix."""
+        if prefix not in state.prefixes:
+            raise ValueError("Prefix %s doesn't belong to state." % prefix)
+        stack = [(state, prefix)]
+        while stack:
+            state_, prefix_ = stack.pop()
+            state_.prefixes.remove(prefix_)
+
+            if state_ in self.delta.keys():
+                for s in self.delta[state_].keys():
+                    child = self.delta[state_][s]
+                    if prefix_ + [s] in child.prefixes:
+                        stack.append((child, prefix_ + [s]))
 
     # todo: remove the usage of SimpleDFA and implement minimize, complete, trimming
-    def to_simpledfa(self, minimize=True, trim=True):
+    def to_simpledfa(self, minimize, trim):
         alphabet = set(self.alphabet)
         states_mapping = {state: 'state' + str(i + 1) for i, state in enumerate(self.Q)}
         states = set([states_mapping[state] for state in self.Q])
@@ -98,12 +158,14 @@ class DFA:
         accepting_states = {states_mapping[self.F]}
 
         transition_function = {states_mapping[state]: {symbol: states_mapping[
-            s] for symbol, s in self.delta[state].items()} for state in self.delta.keys()}
+            s] for symbol, s in self.delta[state].items()} for state in self.delta.keys()}  # if state != self.F
         dfa = SimpleDFA(states, alphabet, initial_state, accepting_states, transition_function)
-        if minimize:
-            dfa = dfa.minimize()
-        if trim:
-            dfa = dfa.trim()
+
+        # if minimize:
+        #     dfa = dfa.minimize()
+        # if trim:
+        #     dfa = dfa.trim()
+
         return dfa
 
     def plot(self, fname, minimize=True, trim=True):

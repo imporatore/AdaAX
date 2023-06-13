@@ -79,8 +79,18 @@ if __name__ == "__main__":
     # for nam in names:
     #     for mod in models:
     #         run(nam, mod)
-    run('synthetic1', 'gru', {"load_vocab": True, "load_loader": True})
+    # run('synthetic1', 'rnn', {"load_vocab": True, "load_loader": True, "total_epoch": 10})
+    # run('synthetic1', 'lstm', {"load_vocab": True, "load_loader": True})
+    # # run('synthetic1', 'gru', {"load_vocab": True, "load_loader": True})
+    # run('synthetic2', 'rnn', {"load_vocab": True, "load_loader": True})
+    # run('synthetic2', 'lstm', {"load_vocab": True, "load_loader": True, "total_epoch": 10, "learning_rate": 0.005})
+    # run('synthetic2', 'gru', {"load_vocab": True, "load_loader": True, "total_epoch": 10, "learning_rate": 0.005})
+    run('tomita1', 'rnn', {"load_vocab": True, "load_loader": True, "total_epoch": 10})
+    run('tomita1', 'lstm', {"load_vocab": True, "load_loader": True})
     run('tomita1', 'gru', {"load_vocab": True, "load_loader": True})
+    run('yelp', 'rnn', {"load_vocab": True, "load_loader": True})
     run('yelp', 'lstm', {"load_vocab": True, "load_loader": True})
     run('yelp', 'gru', {"load_vocab": True, "load_loader": True})
-
+    # run('tomita1', 'gru', {"load_vocab": True, "load_loader": True})
+    # run('yelp', 'lstm', {"load_vocab": True, "load_loader": True})
+    # run('yelp', 'gru', {"load_vocab": True, "load_loader": True})
