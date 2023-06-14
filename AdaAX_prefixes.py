@@ -37,7 +37,7 @@ def add_pattern(dfa, p, h):
             q1 = new_dfa.delta[q1][s]
             if START_PREFIX + p[:i + 1] not in q1.prefixes:
                 q1.prefixes.append(START_PREFIX + p[:i + 1])
-            if q1 == new_dfa.F:
+            if dfa.absorb and q1 == new_dfa.F:
                 return new_dfa, Q_new
         else:
             q1 = new_dfa.add_new_state(START_PREFIX + p[:i + 1], h[i], prev=q1)
@@ -116,6 +116,9 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
                     break
 
         print("Pattern %d, current fidelity: %f" % (i + 1, dfa_fidelity))
+
+    check_consistency(dfa, check_transition=False, check_state=True, check_empty=True, check_null_states=True)
+    print("Finished, extracted DFA fidelity: %f." % dfa.fidelity(loader))
 
     return dfa
 
@@ -214,14 +217,9 @@ def merge_states(dfa, state1, state2, inplace=False):
                 for s in forward.keys():
                     forward[s] = mapping_[forward[s]]
 
-    if new_dfa.F in new_dfa.delta.keys():
-        del new_dfa.delta[new_dfa.F]
-        # also have to delete prefixes which are unreachable (beyond the accepting state)
-
-    # if not inplace:  # Only check consistency when all merging is done
-    #     check_consistency(new_dfa, check_transition=False, check_state=True, check_empty=True, check_null_states=True)
-    # check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True)
-    new_dfa._check_null_states()
+    if not inplace:  # Only check consistency when all merging is done
+        check_consistency(new_dfa, check_transition=False, check_state=True, check_empty=True, check_null_states=True)
+    # check_consistency(new_dfa, check_transition=False, check_state=True, check_empty=True, check_null_states=True)
 
     return new_dfa, mapping
 
@@ -242,7 +240,7 @@ def main(config):
     accept_state = build_accept_state()
     accept_state._h = np.mean(loader.hidden_states[loader.rnn_output == 1, -1, :], axis=0)
 
-    dfa = DFA(loader.alphabet, start_state, accept_state)
+    dfa = DFA(loader.alphabet, start_state, accept_state, config.absorb)
 
     # patterns, support = pattern_extraction(
     #     loader, cluster_num=config.clusters, pruning=config.pruning, remove_padding=True)
@@ -280,6 +278,7 @@ if __name__ == "__main__":
     parser.add_argument("--pos_threshold", type=float, default=POS_THRESHOLD)
 
     # AdaAX parameters
+    parser.add_argument("--absorb", type=bool, default=True)
     parser.add_argument("--merge_start", type=bool, default=True)
     parser.add_argument("--merge_accept", type=bool, default=False)
     parser.add_argument("--neighbour", type=float, default=TAU)

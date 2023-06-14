@@ -1,5 +1,6 @@
 import functools
 from collections import defaultdict
+import warnings
 
 import graphviz as gv
 from pythomata import SimpleDFA  # help trimming, minimizing & plotting
@@ -7,7 +8,7 @@ from pythomata import SimpleDFA  # help trimming, minimizing & plotting
 from States_prefixes import State
 from utils import add_nodes, add_edges, timeit
 from config import START_PREFIX, SEP
-from Fidelity import parse_tree_with_dfa
+from Fidelity import parse_tree_with_dfa, parse_tree_with_non_absorb_dfa
 
 
 # digraph = functools.partial(gv.Digraph, format='png')
@@ -21,13 +22,15 @@ class DFA:
 
     """
 
-    def __init__(self, alphabet, start_state, accept_state):
+    def __init__(self, alphabet, start_state, accept_state, absorb):
         self.alphabet = alphabet  # alphabet
         self.q0 = start_state  # start state
         self.F = accept_state  # accept state
         self.Q = [self.q0, self.F]  # states
 
         self.delta = defaultdict(dict)  # transition table
+
+        self.absorb = absorb  # if accepting state absorb transitions
 
     # todo: use cashed result to accelerate
     def prefix2state(self, prefix):
@@ -80,9 +83,12 @@ class DFA:
                 q = self.delta[q][s]
             else:  # if no transition found, then expression is not among the extracted patterns
                 return False
-            if q == self.F:
+            if self.absorb and q == self.F:
                 return True
-        return False
+        if self.absorb:
+            return False
+        else:
+            return q == self.F
 
     # @timeit
     def fidelity(self, rnn_loader, class_balanced=False):
@@ -100,9 +106,14 @@ class DFA:
         pos_count, total_count = sum(rnn_loader.rnn_output), len(rnn_loader.rnn_output)
         neg_count = total_count - pos_count
 
-        mapping, missing = parse_tree_with_dfa(rnn_loader.prefix_tree.root, self.q0, self)
-        accepted_pos = sum([node.pos_sup for node in mapping[self.F]])
-        accepted_neg = sum([node.neg_sup for node in mapping[self.F]])
+        if self.absorb:
+            mapping, missing = parse_tree_with_dfa(rnn_loader.prefix_tree.root, self.q0, self)
+            accepted_pos = sum([node.pos_sup for node in mapping[self.F]])
+            accepted_neg = sum([node.neg_sup for node in mapping[self.F]])
+        else:
+            mapping, missing = parse_tree_with_non_absorb_dfa(rnn_loader.prefix_tree.root, self.q0, self)
+            accepted_pos = sum([node.pos_prop for node in mapping[self.F]])
+            accepted_neg = sum([node.neg_prop for node in mapping[self.F]])
 
         if not class_balanced:
             return accepted_pos - accepted_neg + neg_count / total_count
@@ -110,6 +121,12 @@ class DFA:
             return total_count * accepted_pos / (2 * pos_count) - total_count * accepted_neg / (2 * neg_count) + .5
         # assert abs(rnn_loader.prefix_tree.fidelity(accepted_sup) - rnn_loader.eval_fidelity(self)) < 1e-6
         # return rnn_loader.eval_fidelity(self)
+
+    def _check_absorbing(self):
+        if self.absorb:
+            if self.F in self.delta.keys():
+                warnings.warn("Exiting transitions found in accepting state when absorb=True")
+                del self.delta[self.F]
 
     def _check_null_states(self):
         reachable_states = {self.q0}
@@ -131,6 +148,35 @@ class DFA:
                             self.A_t.remove(state)  # Remove in "states to be merged" queue for consistency
                     except AttributeError:
                         pass
+
+    def _check_transition_consistency(self):
+        pass
+
+    def _check_state_consistency(self):
+        assert all([s in self.Q for s in self.delta.keys()]), "Transition table has unidentified parent state."
+
+        for state in self.delta.keys():
+            assert all([s in self.Q for s in self.delta[state].values()]), \
+                "Transition table has unidentified child state."
+
+    def _check_empty_transition(self):
+        to_delete_transitions, to_delete_states = [], []
+
+        for state in self.delta.keys():
+            for s in self.delta[state].keys():
+                if self.delta[state][s] is None:
+                    warnings.warn("Empty transition found.")
+                    to_delete_transitions.append((state, s))
+
+            if len(self.delta[state]) == 0:
+                warnings.warn("Empty transition table found.")
+                to_delete_states.append(state)
+
+        for state, s in to_delete_transitions:
+            del self.delta[state][s]
+
+        for state in to_delete_states:
+            del self.delta[state]
 
     def _delete_prefix(self, state, prefix):
         """ Delete a prefix of a given state.

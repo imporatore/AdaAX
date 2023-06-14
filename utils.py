@@ -6,7 +6,7 @@ import numpy as np
 
 from config import START_SYMBOL, START_PREFIX, RNN_RESULT_DIR, VOCAB_DIR
 from data.utils import load_npy, load_pickle
-from Fidelity import PrefixTree4Support
+from Fidelity import PrefixTree4Fidelity
 
 
 # ----------------------------------- Data Structure ----------------------------------------
@@ -109,7 +109,7 @@ class RNNLoader:
         self.decoded_input_seq = np.array([self.decode(
             seq, remove_padding=False, as_list=True) for seq in self.input_sequences])
         # self.prefix_tree = PrefixTree(self.decoded_input_seq, self.hidden_states)
-        self.prefix_tree = PrefixTree4Support(self.decoded_input_seq, self.hidden_states, self.rnn_output)
+        self.prefix_tree = PrefixTree4Fidelity(self.decoded_input_seq, self.hidden_states, self.rnn_output)
 
     # The hidden value in the RNN for given prefix
     # todo: Accelerate by using cashed hidden states

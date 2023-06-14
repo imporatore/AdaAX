@@ -35,7 +35,7 @@ def add_pattern(dfa, p, h):
     for i, s in enumerate(p[:-1]):
         if s in new_dfa.delta[q1].keys():
             q1 = new_dfa.delta[q1][s]
-            if q1 == new_dfa.F:
+            if dfa.absorb and q1 == new_dfa.F:
                 return new_dfa, Q_new
         else:
             q1 = new_dfa.add_new_state(START_PREFIX + p[:i + 1], h[i], prev=q1)
@@ -101,17 +101,23 @@ def build_dfa(loader, dfa, patterns, merge_start, merge_accept, tau, delta):
                 if N_t.get(s, 0) >= tau:  # threshold (Euclidean distance of hidden values) for merging states
                     break
 
-                new_dfa, _ = merge_states(dfa, q_t, s)  # create the DFA after merging
+                try:
+                    new_dfa, _ = merge_states(dfa, q_t, s)  # create the DFA after merging
+                except RuntimeError:  # Start state & accepting state merged
+                    continue
 
-                if len(new_dfa.Q) > 1:
-                    new_dfa_fidelity = new_dfa.fidelity(loader)
-                    # accept merging if fidelity loss below threshold
-                    if dfa_fidelity - new_dfa_fidelity <= delta:
-                        print("Merged: dfa fidelity %f; new dfa fidelity %f" % (dfa_fidelity, new_dfa_fidelity))
-                        dfa, dfa_fidelity = new_dfa, new_dfa_fidelity
-                        break
+                new_dfa_fidelity = new_dfa.fidelity(loader)
+                # accept merging if fidelity loss below threshold
+                if dfa_fidelity - new_dfa_fidelity <= delta:
+                    print("Merged: dfa fidelity %f; new dfa fidelity %f" % (dfa_fidelity, new_dfa_fidelity))
+                    dfa, dfa_fidelity = new_dfa, new_dfa_fidelity
+                    break
+
 
         print("Pattern %d, current fidelity: %f" % (i + 1, dfa_fidelity))
+
+    check_consistency(dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True)
+    print("Finished, extracted DFA fidelity: %f." % dfa.fidelity(loader))
 
     return dfa
 
@@ -143,6 +149,9 @@ def merge_states(dfa, state1, state2, inplace=False):
         new_dfa.q0 = mapped_state2
     elif state1 == dfa.F:
         new_dfa.F = mapped_state2
+
+    if new_dfa.q0 == new_dfa.F:
+        raise RuntimeError("Start state & accepting state merged. Quit merging.")
 
     # update to-merge list
     if state1 in dfa.A_t:
@@ -190,9 +199,6 @@ def merge_states(dfa, state1, state2, inplace=False):
                 for s in forward.keys():
                     forward[s] = mapping_[forward[s]]
 
-    if new_dfa.F in new_dfa.delta.keys():
-        new_dfa.delta.delete_forward(new_dfa.F)
-
     if not inplace:  # Only check consistency when all merging is done
         check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True)
     # check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True)
@@ -216,7 +222,7 @@ def main(config):
     accept_state = build_accept_state()
     accept_state._h = np.mean(loader.hidden_states[loader.rnn_output == 1, -1, :], axis=0)
 
-    dfa = DFA(loader.alphabet, start_state, accept_state)
+    dfa = DFA(loader.alphabet, start_state, accept_state, config.absorb)
 
     # patterns, support = pattern_extraction(
     #     loader, cluster_num=config.clusters, pruning=config.pruning, remove_padding=True)
@@ -254,6 +260,7 @@ if __name__ == "__main__":
     parser.add_argument("--pos_threshold", type=float, default=POS_THRESHOLD)
 
     # AdaAX parameters
+    parser.add_argument("--absorb", type=bool, default=True)
     parser.add_argument("--merge_start", type=bool, default=True)
     parser.add_argument("--merge_accept", type=bool, default=False)
     parser.add_argument("--neighbour", type=float, default=TAU)

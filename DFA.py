@@ -1,4 +1,5 @@
 import functools
+import warnings
 
 import graphviz as gv
 from pythomata import SimpleDFA  # help trimming, minimizing & plotting
@@ -7,7 +8,8 @@ from States import State
 from Transition import TransitionTable
 from utils import add_nodes, add_edges, timeit
 from config import START_PREFIX, SEP
-from Fidelity import parse_tree_with_dfa
+from Fidelity import parse_tree_with_dfa, parse_tree_with_non_absorb_dfa
+
 
 # digraph = functools.partial(gv.Digraph, format='png')
 # graph = functools.partial(gv.Graph, format='png')
@@ -20,13 +22,15 @@ class DFA:
 
     """
 
-    def __init__(self, alphabet, start_state, accept_state):
+    def __init__(self, alphabet, start_state, accept_state, absorb):
         self.alphabet = alphabet  # alphabet
         self.q0 = start_state  # start state
         self.F = accept_state  # accept state
         self.Q = [self.q0, self.F]  # states
 
         self.delta = TransitionTable()  # transition table
+
+        self.absorb = absorb  # if accepting state absorb transitions
 
     # todo: use cashed result to accelerate
     def prefix2state(self, prefix):
@@ -68,9 +72,12 @@ class DFA:
                 q = self.delta[q][s]
             else:  # if no transition found, then expression is not among the extracted patterns
                 return False
-            if q == self.F:
+            if self.absorb and q == self.F:
                 return True
-        return False
+        if self.absorb:
+            return False
+        else:
+            return q == self.F
 
     # @timeit
     def fidelity(self, rnn_loader, class_balanced=False):
@@ -88,9 +95,14 @@ class DFA:
         pos_count, total_count = sum(rnn_loader.rnn_output), len(rnn_loader.rnn_output)
         neg_count = total_count - pos_count
 
-        mapping, missing = parse_tree_with_dfa(rnn_loader.prefix_tree.root, self.q0, self)
-        accepted_pos = sum([node.pos_sup for node in mapping[self.F]])
-        accepted_neg = sum([node.neg_sup for node in mapping[self.F]])
+        if self.absorb:
+            mapping, missing = parse_tree_with_dfa(rnn_loader.prefix_tree.root, self.q0, self)
+            accepted_pos = sum([node.pos_sup for node in mapping[self.F]])
+            accepted_neg = sum([node.neg_sup for node in mapping[self.F]])
+        else:
+            mapping, missing = parse_tree_with_non_absorb_dfa(rnn_loader.prefix_tree.root, self.q0, self)
+            accepted_pos = sum([node.pos_prop for node in mapping[self.F]])
+            accepted_neg = sum([node.neg_prop for node in mapping[self.F]])
 
         if not class_balanced:
             return accepted_pos - accepted_neg + neg_count / total_count
@@ -98,6 +110,12 @@ class DFA:
             return total_count * accepted_pos / (2 * pos_count) - total_count * accepted_neg / (2 * neg_count) + .5
         # assert abs(rnn_loader.prefix_tree.fidelity(accepted_sup) - rnn_loader.eval_fidelity(self)) < 1e-6
         # return rnn_loader.eval_fidelity(self)
+
+    def _check_absorbing(self):
+        if self.absorb:
+            if self.F in self.delta.keys():
+                warnings.warn("Exiting transitions found in accepting state when absorb=True")
+                self.delta.delete_forward(self.F)
 
     def _check_null_states(self):
         reachable_states = {self.q0}
@@ -115,6 +133,15 @@ class DFA:
                             self.A_t.remove(state)  # Remove in "states to be merged" queue for consistency
                     except AttributeError:
                         pass
+
+    def _check_transition_consistency(self):
+        self.delta._check_transition_consistency()
+
+    def _check_state_consistency(self):
+        self.delta._check_state_consistency(self.Q)
+
+    def _check_empty_transition(self):
+        self.delta._check_empty_transition()
 
     # todo: remove the usage of SimpleDFA and implement minimize, complete, trimming
     def to_simpledfa(self, minimize, trim):

@@ -224,8 +224,10 @@ class PatternIterator:
                 yield pattern, hidden, support
 
 
+# todo: examine if this should modify when absorb=False
 class PatternSampler:
 
+    # def __init__(self, prefix_tree, pos_threshold, absorb_dfa):
     def __init__(self, prefix_tree, pos_threshold):
         """
         Args:
@@ -235,6 +237,7 @@ class PatternSampler:
         """
         self.root = prefix_tree.root
         self.threshold = pos_threshold
+        # self._absorb = absorb_dfa
 
     def __iter__(self):
         """ Parse the tree using BFS (so that simpler/shorter patterns come first)
@@ -245,18 +248,42 @@ class PatternSampler:
                 - score \propto pos_prop
                 i.e. score := length * log(pos_prop)
                     - require Laplace smoothing
+
+        Note: this threshold method doesn't work well for negative pattern, e.g. Tomita 4: '000' not in expression
+            - as even '1111' can be followed by '000', and thus wasn't considered a positive pattern
+            - may be resolved by using '<pad>' to locate (seems to suit both absorb=True & absorb=False)
+            - this serve as a very good 'twisting' test
         """
         queue = deque([(self.root, [self.root.val], [self.root.h])])
         while queue:
             node, expr, hidden = queue.popleft()
 
             if node.pos_sup / (node.pos_sup + node.neg_sup) >= self.threshold:
-                yield expr, hidden, (node.pos_sup, node.neg_sup)
+                if node.val == '<pad>':
+                    assert expr[-2] != '<pad>'
+                    yield expr[:-1], hidden[:-1], (node.pos_sup, node.neg_sup)  # todo: sup incorrect
+                else:
+                    yield expr, hidden, (node.pos_sup, node.neg_sup)
+                # if self._absorb:
+                #     yield expr, hidden, (node.pos_sup, node.neg_sup)
+                # else:
+                #     if node.val == '<pad>':
+                #         assert expr[-2] != '<pad>'
+                #         yield expr[:-1], hidden[:-1], (node.pos_sup, node.neg_sup)  # todo: sup incorrect
+                #     else:
+                #         yield expr, hidden, (node.pos_sup, node.neg_sup)
 
             else:
-                for n in node.next:
-                    if n.val != '<PAD>':
+                if node.val != '<pad>':
+                    for n in node.next:
                         queue.append((n, expr + [n.val], hidden + [n.h]))
+                # if self._absorb:
+                #     for n in node.next:
+                #         if n.val != '<pad>':
+                #             queue.append((n, expr + [n.val], hidden + [n.h]))
+                # elif node.val != '<pad>':
+                #     for n in node.next:
+                #         queue.append((n, expr + [n.val], hidden + [n.h]))
 
 
 if __name__ == "__main__":
@@ -264,7 +291,7 @@ if __name__ == "__main__":
     from config import K, THETA
 
     loader = RNNLoader('tomita_data_1', 'gru')
-    pos_patterns, pos_supports = pattern_extraction(loader, cluster_num=K, pruning=THETA, label=True)
+    # pos_patterns, pos_supports = pattern_extraction(loader, cluster_num=K, pruning=THETA, label=True)
     # neg_patterns, neg_supports = pattern_extraction(loader, cluster_num=K, pruning=THETA, label=False)
 
     # pattern_tree = PatternTree(loader.prefix_tree)
@@ -274,8 +301,14 @@ if __name__ == "__main__":
     # for res in pattern_tree:
     #     print(res)
 
-    pos_pattern_tree = PositivePatternTree(loader.prefix_tree)
-    pos_pattern_tree.update_patterns(pos_patterns, pos_supports)
-    for res in pos_pattern_tree:
-        print(res)
+    # pos_pattern_tree = PositivePatternTree(loader.prefix_tree)
+    # pos_pattern_tree.update_patterns(pos_patterns, pos_supports)
+    # for res in pos_pattern_tree:
+    #     print(res)
+
+    # pattern_sampler = PatternSampler(loader.prefix_tree, pos_threshold=.95, absorb_dfa=True)
+    pattern_sampler = PatternSampler(loader.prefix_tree, pos_threshold=.95)
+    for p, _, _ in pattern_sampler:
+        print(p)
+
     pass

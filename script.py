@@ -8,43 +8,41 @@ DEFAULT_CONFIG = {"dfa_dir": DFA_DIR,
                   # "start_symbol": START_SYMBOL,
                   "plot": True,
                   "merge_start": True,
-                  "merge_accept": False
-                  }
+                  "merge_accept": False}
 
 synthetic1_config = {"fname": "synthetic_data_1",
                      "clusters": K,
                      "pruning": THETA,
                      "pos_threshold": .95,
                      "neighbour": 1.,
-                     "fidelity_loss": 0.}
+                     "fidelity_loss": 0.,
+                     "absorb": True}
 
 synthetic2_config = {"fname": "synthetic_data_2",
                      "clusters": K,
                      "pruning": THETA,
-                     "pos_threshold": POS_THRESHOLD,
-                     "neighbour": TAU,
-                     "fidelity_loss": DELTA}
+                     "pos_threshold": .95,
+                     "neighbour": 1.5,
+                     "fidelity_loss": 0.,
+                     "absorb": True}
 
 tomita1_config = {"fname": "tomita_data_1",
                   "clusters": K,
                   "pruning": THETA,
-                  "pos_threshold": POS_THRESHOLD,
-                  "neighbour": TAU,
-                  "fidelity_loss": DELTA}
+                  "pos_threshold": .95,
+                  "neighbour": 1.,
+                  "fidelity_loss": 0.,
+                  "absorb": False}
 
-tomita2_config = {"fname": "tomita_data_2",
-                  "clusters": K,
-                  "pruning": THETA,
-                  "pos_threshold": POS_THRESHOLD,
-                  "neighbour": TAU,
-                  "fidelity_loss": DELTA}
+tomita2_config = {}
 
 yelp_config = {"fname": "yelp_review_balanced",
                "clusters": K,
                "pruning": THETA,
                "pos_threshold": POS_THRESHOLD,
                "neighbour": TAU,
-               "fidelity_loss": DELTA}
+               "fidelity_loss": DELTA,
+               "absorb": False}
 
 
 def run(name, type, config=None):
@@ -84,7 +82,15 @@ if __name__ == "__main__":
     # for nam in names:
     #     for mod in models:
     #         run(nam, mod)
-    run('synthetic1', 'gru', {"load_vocab": True, "load_loader": True})
-    # run('tomita1', 'gru', {"load_vocab": True, "load_loader": True})
-    # run('yelp', 'lstm', {"load_vocab": True, "load_loader": True})
-    # run('yelp', 'gru', {"load_vocab": True, "load_loader": True})
+    # run('synthetic1', 'rnn')  # todo: "check State not found" error: prefix2state
+    # run('synthetic1', 'lstm')
+    # run('synthetic1', 'gru')
+    # run('synthetic2', 'rnn')  # todo: check "accepting state unreachable" error: bi-direction
+    # run('synthetic2', 'lstm')
+    # run('synthetic2', 'gru')
+    # run('tomita1', 'rnn')
+    # run('tomita1', 'lstm')
+    # run('tomita1', 'gru')
+    run('tomita1', 'gru', {"absorb": True})
+    # run('yelp', 'lstm')
+    # run('yelp', 'gru')

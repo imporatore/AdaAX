@@ -3,23 +3,26 @@ from functools import wraps
 
 # todo: examine the order of these ops
 def check_consistency(dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True):
+
+    dfa._check_absorbing()
+
+    if check_null_states:
+        dfa._check_null_states()
+
     if check_transition:  # only available in bidirectional transition table
         try:
-            dfa.delta._check_transition_consistency()
+            dfa._check_transition_consistency()
         except AssertionError as message:
             raise RuntimeError(message)
 
     if check_state:
         try:
-            dfa.delta._check_state_consistency(dfa.Q)
+            dfa._check_state_consistency()
         except AssertionError as message:
             raise RuntimeError(message)
 
     if check_empty:
-        dfa.delta._check_empty_transition()
-
-    if check_null_states:
-        dfa._check_null_states()
+        dfa._check_empty_transition()
 
 
 class ConsistencyCheck:
