@@ -1,8 +1,12 @@
-from collections import defaultdict
 import warnings
+from collections import defaultdict
 
 
 class WrappedDict:
+    """ Helper class for a wrapped dict.
+
+    So that a class may have additional attributes and methods while still behaves like a dict.
+    """
 
     def __init__(self, *args, **kwargs):
         self._items = dict(*args, **kwargs)
@@ -60,46 +64,71 @@ class WrappedDict:
 
 
 class ForwardTransition(WrappedDict):
+    """ Forward transition table for one state.
+
+    Backward transitions would be updated automatically after forward transitions changes.
+    """
 
     def __init__(self, table, state, *args, **kwargs):
+        """
+        Args:
+            table: TransitionTable
+            state: the start state of the forward transitions
+        """
         self.__table, self.__state = table, state
         super().__init__(*args, **kwargs)
 
     def __setitem__(self, key, value):
         """ Update transition self.state ----> key ----> value."""
         if key in self._items.keys():
+            # remove existing backward transition
             self.__table.backward[self._items[key]][key].remove(self.__state)
         self._items.__setitem__(key, value)
+        # update backward transition
         if self.__state not in self.__table.backward[value][key]:
             self.__table.backward[value][key].append(self.__state)
 
     def __missing__(self, key):
-        # self._items[key] = None
-        # return super(ForwardTransition, self).__getitem__(key)
+        """ Called when key missing in self._items[key]. Return None."""
         return None
 
 
 class BackwardTransition(WrappedDict):
+    """ Backward transition table for one state."""
 
     def __init__(self, table, state, *args, **kwargs):
+        """
+        Args:
+            table: TransitionTable
+            state: the start state of the backward transitions
+        """
         self.__table, self.__state = table, state
         super().__init__(*args, **kwargs)
 
     def __missing__(self, key):
+        """ Called when key missing in self._items[key]. Set the value (parents) to an empty list [] and return."""
         self._items[key] = list()
         return self._items.__getitem__(key)
 
     def __len__(self):
+        """ Count of all backward transitions of the state self.__state."""
         return sum([len(transit) for transit in self.values()])
 
 
 class Table(WrappedDict):
+    """ Transition table for DFA in one direction."""
 
     def __init__(self, table, direction, *args, **kwargs):
+        """
+        Args:
+            table: TransitionTable
+            direction: str, choices: ['forward', 'backward']
+        """
         self.__table, self.__direction = table, direction
         super().__init__(*args, **kwargs)
 
     def __missing__(self, key):
+        """ Called when key (state) missing in self._items[key]. Set an empty transition for the state and return."""
         if self.__direction == 'forward':
             self._items[key] = ForwardTransition(self.__table, key)
         elif self.__direction == 'backward':
@@ -107,9 +136,13 @@ class Table(WrappedDict):
         return self._items.__getitem__(key)
 
     def __len__(self):
+        """ Count of all self.__direction ('forward'/'backward') transitions."""
         return sum([len(transition) for transition in self.values()])
 
     def pop(self, k, **kwargs):
+        """ Pop the transition table for one state.
+
+        When the state doesn't have its transition table, return an empty table."""
         try:
             return self._items.pop(k, **kwargs)
         except KeyError:
@@ -120,45 +153,65 @@ class Table(WrappedDict):
 
 
 class TransitionTable:  # todo: __new__
+    """ Bidirectional transition table.
+
+    Most methods act upon forward table."""
 
     def __init__(self):
-        self.forward = Table(self, direction='forward')  # dict{state: dict{symbol: state}}
-        self.backward = Table(self, direction='backward')  # dict{state: dict{symbol: list[state]}}
+        self.forward = Table(self, direction='forward')  # dict[state: dict[symbol: state]]
+        self.backward = Table(self, direction='backward')  # dict[state: dict[symbol: list[state]]]
 
     def __getitem__(self, item):
+        """ Get item from forward table."""
         return self.forward[item]
 
     def __setitem__(self, key, value):
+        """ Directly set a transition dict of a state.
+
+        Deprecated."""
         self.forward.__setitem__(key, value)
         for symbol, state in value.items():
             self.backward[state][symbol].append(key)
 
     def __len__(self):
+        """ Count of all forward transitions (the num of backward transitions are the same)."""
         return self.forward.__len__()
 
     def keys(self):
+        """ States in the forward transition table."""
         return self.forward.keys()
 
     def get(self, *args, **kwargs):
+        """ 'Get' method of the forward transition table."""
         return self.forward.get(*args, **kwargs)
 
     def get_backward(self, *args, **kwargs):
+        """ 'Get' method of the backward transition table."""
         return self.backward.get(*args, **kwargs)
 
     def pop(self, item):
+        """ Pop a state out of the DFA. Remove all the relevant forward & backward transitions.
+
+        Return:
+            forward_transition, backward_transition: tuple(dict, dict),
+                - set the output into dict to prevent the changing of popped transitions from affecting
+                existing transition table
+        """
         forward_transition = self.forward.pop(item)
         backward_transition = self.backward.pop(item)
 
         # remove entering transition in forward dict
         for symbol in backward_transition.keys():
             for state in backward_transition[symbol]:
-                if state != item:  # self-loop
+                if state != item:  # self-loop, forward transition already popped
                     del self.forward[state][symbol]
 
         # remove exiting transition in backward dict
         for symbol, state in forward_transition.items():
             if state != item:  # self-loop, backward transition already popped
                 self.backward[state][symbol].remove(item)
+
+                # check empty transitions
                 if not self.backward[state][symbol]:
                     del self.backward[state][symbol]
                     if not self.backward[state]:
@@ -167,18 +220,25 @@ class TransitionTable:  # todo: __new__
         return forward_transition.todict(), backward_transition.todict()
 
     def delete_forward(self, item):
+        """ Delete the forward transitions of a state, i.e., for the accept states of absorb=True DFA."""
         forward_transition = self.forward.pop(item)
 
         # remove exiting transition in backward dict
         for symbol, state in forward_transition.items():
             self.backward[state][symbol].remove(item)
+
+            # check empty transitions
             if not self.backward[state][symbol]:
                 del self.backward[state][symbol]
                 if not self.backward[state]:
                     del self.backward[state]
 
     def _check_transition_consistency(self):
-        """ Check consistency of forward and backward transitions."""
+        """ Check consistency of forward and backward transitions by edges.
+
+        Note:
+            edges is a dict: dict[(parent, child)] = [transition_symbol1, transition_symbol2, ...]
+        """
         forward_edges_dict, backward_edges_dict = defaultdict(set), defaultdict(set)
 
         for parent in self.forward.keys():
@@ -247,23 +307,4 @@ class TransitionTable:  # todo: __new__
 
 
 if __name__ == '__main__':
-    import random
-    import copy
-
-    delta = TransitionTable()
-    delta[1]['a'] = 2
-    # delta.backward._Table__table
-    # delta.forward._Table__table
-    delta[1]['b'] = 3
-    delta[2]['a'] = 3
-    #
-    # for i in range(100):
-    #     delta[random.randint(0, 10)][random.choice('abcdefgh')] = random.randint(0, 10)
-    # new_delta = copy.deepcopy(delta)
-    # delta._check_transition_consistency()
-    # delta._check_state_consistency([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    print(delta.pop(1))
-    # delta._check_transition_consistency()
-    # delta._check_state_consistency([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    # delta._check_state_consistency([0, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     pass

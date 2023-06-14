@@ -8,14 +8,9 @@ __pycache__/*.pyc
 
 /AdaAX-main/
 /backup/
-/easy_implementation/
 /lstar/
 
 /RNN/__pycache__/
-/RNN/imdb.ipynb
-/RNN/imdb2023.5.16.ipynb
-/RNN/yelp_classification_ChatGPT.ipynb
-/RNN/yelp_classification_GPT4.ipynb
 
 /data/__pycache__/
 /data/rnn_result/

@@ -1,4 +1,4 @@
-from config import RNN_MODEL_DIR, RNN_RESULT_DIR, START_SYMBOL
+from config import RNN_MODEL_DIR, RNN_RESULT_DIR
 from utils import ConfigDict
 from main import main
 
@@ -74,23 +74,19 @@ def run(name, type, config=None):
 
 
 if __name__ == "__main__":
-    # names = ['synthetic1', 'synthetic2', 'tomita1', 'tomita2', 'yelp']
-    # models = ['rnn', 'lstm', 'gru']
-    # for nam in names:
-    #     for mod in models:
-    #         run(nam, mod)
-    # run('synthetic1', 'rnn', {"load_vocab": True, "load_loader": True, "total_epoch": 10})
-    # run('synthetic1', 'lstm', {"load_vocab": True, "load_loader": True})
-    # # run('synthetic1', 'gru', {"load_vocab": True, "load_loader": True})
-    # run('synthetic2', 'rnn', {"load_vocab": True, "load_loader": True})
-    # run('synthetic2', 'lstm', {"load_vocab": True, "load_loader": True, "total_epoch": 10, "learning_rate": 0.005})
-    # run('synthetic2', 'gru', {"load_vocab": True, "load_loader": True, "total_epoch": 10, "learning_rate": 0.005})
-    run('tomita1', 'rnn', {"load_vocab": True, "load_loader": True, "total_epoch": 10})
-    run('tomita1', 'lstm', {"load_vocab": True, "load_loader": True})
-    run('tomita1', 'gru', {"load_vocab": True, "load_loader": True})
-    run('yelp', 'rnn', {"load_vocab": True, "load_loader": True})
-    run('yelp', 'lstm', {"load_vocab": True, "load_loader": True})
-    run('yelp', 'gru', {"load_vocab": True, "load_loader": True})
-    # run('tomita1', 'gru', {"load_vocab": True, "load_loader": True})
-    # run('yelp', 'lstm', {"load_vocab": True, "load_loader": True})
-    # run('yelp', 'gru', {"load_vocab": True, "load_loader": True})
+    run('synthetic1', 'rnn', {"total_epoch": 10})
+    run('synthetic1', 'lstm')
+    run('synthetic1', 'gru')
+    run('synthetic2', 'rnn')
+    run('synthetic2', 'lstm', {"total_epoch": 10, "learning_rate": 0.005})
+    run('synthetic2', 'gru', {"total_epoch": 10, "learning_rate": 0.005})
+    run('tomita1', 'rnn', {"total_epoch": 10})
+    run('tomita1', 'lstm')
+    run('tomita1', 'gru')
+    # run('tomita2', 'rnn')
+    # run('tomita2', 'lstm')
+    # run('tomita2', 'gru')
+    run('yelp', 'rnn')
+    run('yelp', 'lstm')
+    run('yelp', 'gru')
+    pass

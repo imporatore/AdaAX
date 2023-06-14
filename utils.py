@@ -4,119 +4,68 @@ import functools
 
 import numpy as np
 
-from config import START_SYMBOL, START_PREFIX, RNN_RESULT_DIR, VOCAB_DIR
+from config import RNN_RESULT_DIR, VOCAB_DIR
 from data.utils import load_npy, load_pickle
 from Fidelity import PrefixTree4Fidelity
 
 
-# ----------------------------------- Data Structure ----------------------------------------
-
-class SymbolNode(object):
-
-    def __init__(self, val):
-        self.val = val  # Symbol in the alphabet
-        self.next = []
-
-    def __getattr__(self, item):
-        if item in ['pos_sup', 'neg_sup']:
-            try:
-                return super().__getattr__(item)
-            except AttributeError:
-                return 0
-        return super().__getattr__(item)
-
-    @property
-    def sup(self):
-        if self.pos_sup or self.neg_sup:
-            return self.pos_sup - self.neg_sup
-        raise AttributeError("Node has neither positive support nor negative support.")
-
-
-class PrefixTree:
-    def __init__(self, seq, hidden):
-        self.root = SymbolNode(START_SYMBOL)
-        self.root.h = hidden[0, 0, :]  # hidden values for start symbol
-        self._build_tree(seq, hidden)
-
-    def _build_tree(self, seq, hidden):
-        for s, h in zip(seq, hidden):
-            self._update(s[len(START_PREFIX):], h[len(START_PREFIX):])
-
-    def _update(self, s, h):
-        cur = self.root
-        for i, symbol in enumerate(s):
-            for n in cur.next:
-                if n.val == symbol:
-                    cur = n
-                    break
-            else:
-                node = SymbolNode(symbol)
-                node.h = h[i, :]
-                cur.next.append(node)
-                cur = node
-
-    def eval_hidden(self, expr):
-        cur = self.root
-        for symbol in expr:
-            for n in cur.next:
-                if n.val == symbol:
-                    cur = n
-        return cur.h
-
-
 # --------------------------------------- Pipeline ---------------------------------------
 
-def read_results(name, model):
+def read_results(name, model, read_train, read_valid, read_test):
+    """ Helper function for reading RNN results."""
     result_dir = os.path.join(RNN_RESULT_DIR, name, model)
 
-    train_result = load_npy(result_dir, 'train_data').item()
-    test_result = load_npy(result_dir, 'test_data').item()
+    result, loaded, vocab = {}, [], load_pickle(VOCAB_DIR, name)
 
-    try:
-        valid_result = load_npy(result_dir, 'valid_data').item()
-    except FileNotFoundError:
-        valid_result = None
+    if read_train:
+        loaded.append(load_npy(result_dir, 'train_data').item())
+    if read_valid:
+        try:
+            loaded.append(load_npy(result_dir, 'valid_data').item())
+        except FileNotFoundError:
+            pass
+    if read_test:
+        loaded.append(load_npy(result_dir, 'test_data').item())
 
-    vocab = load_pickle(VOCAB_DIR, name)
-
-    result = {}
-    for res in [train_result, valid_result, test_result]:
-        if res:
-            for i in ['input', 'hidden', 'output']:
-                result[i] = np.concatenate((result.get(i, np.ndarray(
-                    (0, *res[i].shape[1:]), dtype=res[i].dtype)), res[i]), axis=0)
+    for res in loaded:
+        for i in ['input', 'hidden', 'output']:
+            result[i] = np.concatenate((result.get(i, np.ndarray(
+                (0, *res[i].shape[1:]), dtype=res[i].dtype)), res[i]), axis=0)
 
     return vocab, result['input'], result['hidden'], result['output']
 
 
 class RNNLoader:
 
-    def __init__(self, name, model):
+    def __init__(self, name, model, read_train=True, read_valid=True, read_test=True):
         """ Result loader of trained RNN for extracting patterns and building DFA.
 
+        Args:
+            name: str, choices: ['synthetic1', 'synthetic2', 'tomita1', 'tomita2', 'yelp']
+            model: str: choices: ['rnn', 'lstm', 'gru']
+            read_train: bool, whether to read train data
+            read_valid: bool, whether to read validation data
+            read_test: bool, whether to read test data
+
         Attributes:
+            - vocab: RNN vocabulary for decoding sequence
             - alphabet: list of shape (VOCAB_SIZE)
             - rnn_data: (input_sequence, hidden_states, rnn_output)
                 - input_sequence, np.array of shape (N, PAD_LEN)
                 - hidden_states, np.array of shape (N, PAD_LEN, hidden_dim)
                 - rnn_output, np.array of shape (N,)
+                - decoded_input_seq, np.array of shape (N, PAD_LEN, hidden_dim), decoded input strings
+            - prefix-tree: tree structure representation of input sequences, used for
+                obtaining hidden values and calculating fidelity
         """
 
-        vocab, *rnn_data = read_results(name, model)
+        vocab, *rnn_data = read_results(name, model, read_train, read_valid, read_test)
         self.vocab, self.alphabet = vocab, vocab.words
         self.input_sequences, self.hidden_states, self.rnn_prob_output = rnn_data
         self.rnn_output = self.rnn_prob_output.round()
         self.decoded_input_seq = np.array([self.decode(
             seq, remove_padding=False, as_list=True) for seq in self.input_sequences])
-        # self.prefix_tree = PrefixTree(self.decoded_input_seq, self.hidden_states)
         self.prefix_tree = PrefixTree4Fidelity(self.decoded_input_seq, self.hidden_states, self.rnn_output)
-
-    # The hidden value in the RNN for given prefix
-    # todo: Accelerate by using cashed hidden states
-    def rnn_hidden_values(self, prefix):
-        if START_SYMBOL:
-            return self.prefix_tree.eval_hidden(prefix[1:])
-        return self.prefix_tree.eval_hidden(prefix)
 
     def decode(self, seq, remove_padding=True, as_list=False, sep=' '):
         text = [self.vocab.words[i] for i in seq]
@@ -126,11 +75,12 @@ class RNNLoader:
             return text
         return sep.join(text)
 
-    # todo: only called when merging, may use cashed result to accelerate, as the difference in the merged DFA is small
     def eval_fidelity(self, dfa):
-        """ Evaluate the fidelity of (extracted) DFA from rnn_loader."""
-        return np.mean([dfa.classify_expression(self.decode(expr, as_list=True)) == ro for expr, ro in zip(
-            self.input_sequences, self.rnn_output)])
+        """ Evaluate the fidelity of (extracted) DFA from rnn_loader.
+
+        Rather slow. Should only be used for test."""
+        return np.mean([dfa.classify_expression(self.decode(expr, as_list=True)) == ro
+                        for expr, ro in zip(self.input_sequences, self.rnn_output)])
 
 
 # ---------------------------- math --------------------------------
@@ -140,9 +90,9 @@ def d(hidden1: np.array, hidden2: np.array):
     return np.sqrt(np.sum((hidden1 - hidden2) ** 2))
 
 
-# ------------------------- plotting -------------------------------
+# ------------------------- graphviz -------------------------------
 
-def add_nodes(graph, nodes):  # stolen from http://matthiaseisen.com/articles/graphviz/
+def add_nodes(graph, nodes):
     for n in nodes:
         if isinstance(n, tuple):
             graph.node(n[0], **n[1])
@@ -151,7 +101,7 @@ def add_nodes(graph, nodes):  # stolen from http://matthiaseisen.com/articles/gr
     return graph
 
 
-def add_edges(graph, edges):  # stolen from http://matthiaseisen.com/articles/graphviz/
+def add_edges(graph, edges):
     for e in edges:
         if isinstance(e[0], tuple):
             graph.edge(*e[0], **e[1])
@@ -160,9 +110,10 @@ def add_edges(graph, edges):  # stolen from http://matthiaseisen.com/articles/gr
     return graph
 
 
-# ---------------------------- logger ---------------------------------
+# ---------------------------- logger & timer ---------------------------------
 
 def logger(func):
+    """ Helper class for a logging decorator."""
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         print(f"----- {func.__name__}: start -----")
@@ -174,6 +125,7 @@ def logger(func):
 
 
 def timeit(func):
+    """ Helper function for a timing decorator."""
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         start = time.perf_counter()
@@ -190,7 +142,7 @@ def timeit(func):
 # ------------------------------- tools ---------------------------------------
 
 class LazyAttribute(object):
-    """ A property that caches itself to the class object. """
+    """ Helper class for lazy initializing class property."""
 
     def __init__(self, func):
         functools.update_wrapper(self, func, updated=[])
@@ -205,7 +157,7 @@ class LazyAttribute(object):
 class ConfigDict:
     """ Helper class for configuration."""
 
-    def __init__(self, config_dict):
+    def __init__(self, config_dict: dict):
         # config_dict: a dict object holding configurations
         self.config = config_dict
 

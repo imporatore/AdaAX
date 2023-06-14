@@ -1,15 +1,32 @@
 from functools import wraps
 
 
+def substitute(lst: list, element1, element2):
+    """ Substitute element1 with element2 in list lst."""
+    if element1 in lst:
+        lst.remove(element1)
+        if element2 not in lst:
+            lst.append(element2)
+
+
 # todo: examine the order of these ops
 def check_consistency(dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True):
+    """ Consistency check of DFA.
 
-    dfa._check_absorbing()
+    Args:
+        check_transition: bool, default=True, check if forward and backward transitions are consistent
+        check_state: bool, default=True, check if there are unrecognized states in forward transitions
+        check_empty: bool, default=True, check if there is empty(null)
+            children state in transitions (due to usage of defaultdict)
+        check_null_states: bool, default=True, check if there are unreachable states
+    """
+
+    dfa._check_absorbing()  # check if accept states have exiting transitions for DFA which absorb=True
 
     if check_null_states:
         dfa._check_null_states()
 
-    if check_transition:  # only available in bidirectional transition table
+    if check_transition:
         try:
             dfa._check_transition_consistency()
         except AssertionError as message:
@@ -26,6 +43,15 @@ def check_consistency(dfa, check_transition=True, check_state=True, check_empty=
 
 
 class ConsistencyCheck:
+    """ Decorator of checks of DFA operations.
+
+    Usage:
+        dfa_check = ConsistencyCheck(dfa)
+
+        @dfa_check(check_transition=True, check_state=True, check_empty=False, check_null_states=True)
+        def operation(dfa):
+            pass
+    """
 
     def __init__(self, dfa):
         self.dfa = dfa

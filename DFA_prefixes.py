@@ -1,40 +1,43 @@
-import functools
 from collections import defaultdict
 import warnings
 
-import graphviz as gv
 from pythomata import SimpleDFA  # help trimming, minimizing & plotting
 
 from States_prefixes import State
-from utils import add_nodes, add_edges, timeit
-from config import START_PREFIX, SEP
 from Fidelity import parse_tree_with_dfa, parse_tree_with_non_absorb_dfa
-
-
-# digraph = functools.partial(gv.Digraph, format='png')
-# graph = functools.partial(gv.Graph, format='png')
 
 
 # todo: add state split to ensure gradually learning more & more difficult patterns from flow or samplers
 class DFA:
-    """
+    """ DFA for AdaAX.
+
     Attributes:
-
+        alphabet: list, alphabet (set of symbols) used in the DFA
+        q0: State, start state of the DFA
+        F: list[State], list of accept states of the DFA
+        Q: list[State], list of states of the DFA
+        delta: TransitionTable, transition table of the DFA
     """
 
-    def __init__(self, alphabet, start_state, accept_state, absorb):
+    def __init__(self, alphabet, start_state, absorb):
+        """
+        Args:
+            alphabet: list, alphabet (set of symbols) used in the DFA
+            start_state: State, start state of the DFA
+            absorb: bool, whether the accept states 'absorb' transitions
+        """
         self.alphabet = alphabet  # alphabet
         self.q0 = start_state  # start state
-        self.F = accept_state  # accept state
-        self.Q = [self.q0, self.F]  # states
+        self.F = []  # accept states
+        self.Q = [self.q0]  # states
 
         self.delta = defaultdict(dict)  # transition table
 
-        self.absorb = absorb  # if accepting state absorb transitions
+        self.absorb = absorb  # if accept state absorb transitions
 
     # todo: use cashed result to accelerate
     def prefix2state(self, prefix):
-        """ Return the state in DFA for prefix.
+        """ Return the state in DFA which holds the given prefix.
 
         Note: We should use prefixes to index instead of parsing transition table as when this prefix2state is called,
             the transition table hadn't updated."""
@@ -44,19 +47,18 @@ class DFA:
         raise ValueError("State for prefix %s not found." % prefix)
 
     def add_new_state(self, prefix, hidden, prev=None):
-        """ Add and return the new state from a new prefix."""
-        state = State(prefix)  # Initialize pure set from new prefix
-        state._h = hidden
+        """ Add and return the new state from a new prefix.
 
-        # Update DFA
+        Args:
+            prefix: list, a list of symbols which initialize the State (as a PureSet).
+            hidden: float, hidden values of 'prefix'
+            prev: None or State, parent state of the nre state
+        """
+        state = State(prefix, hidden_values=hidden)  # Initialize pure set from new prefix
         self.Q.append(state)  # Add to states
 
         if prev:
-            if isinstance(prev, list):
-                for p in prev:
-                    self.add_transit(p, prefix[-1], state)  # Update transition
-            else:
-                self.add_transit(prev, prefix[-1], state)  # Update transition
+            self.add_transit(prev, prefix[-1], state)  # Update transition
 
         return state
 
@@ -64,95 +66,123 @@ class DFA:
         """ Add a transition from state1 to state2 by symbol."""
         self.delta[state1][symbol] = state2  # update transition table
 
-        # todo: use graph-like node link instead of prefix set
-        # the prefixes cannot exceed the training set, or there will be problem concerning self loops and
-        # infinite prefixes
-        # for prefix in state1.prefixes:
-        #     if prefix + [symbol] not in state2.prefixes:
-        #         state2.prefixes.append(prefix + [symbol])
+        # we cannot add prefix exceeding the training set here as there will be recursion problems due to loops
 
     def classify_expression(self, expression):
-        """
+        """ Classify expression using the DFA.
 
-        Note: Missing transitions goes to 'sink' state and classified as Negative.
+        Args:
+            expression: list, list of symbols with only those in the alphabet
+
+        Note:
+            For absorb=True DFAs, once a transition goes to accept states, the expression is classified 'positive'.
+            For absorb=False DFAs, the expression is classified 'positive' iff the state
+                of the last symbol in the expression are among the accept states.
+            Missing transitions goes to 'sink' state and classified as 'negative'.
         """
-        # Expression is string with only letters in alphabet
+        assert all([s in self.alphabet for s in expression])
+
         q = self.q0
-        for s in expression[len(START_PREFIX):]:
+        for s in expression:
             if s in self.delta[q].keys():
                 q = self.delta[q][s]
-            else:  # if no transition found, then expression is not among the extracted patterns
+            else:  # if no transition found, then expression goes to 'sink' state and classified as 'negative'
                 return False
-            if self.absorb and q == self.F:
+            if self.absorb and q in self.F:
                 return True
         if self.absorb:
             return False
         else:
-            return q == self.F
+            return q in self.F
 
-    # @timeit
     def fidelity(self, rnn_loader, class_balanced=False):
         """
+        Args:
+            rnn_loader: RNNLoader
+            class_balanced: bool, default=False, whether to calculate fidelity using class balanced weights
+
+        Math:
+            Note that all expressions which is not accepted is classified as negative,
+            so we may calculate fidelity using these four parts:
+
+            for absorb=True:
+                fidelity = accepted_pos_sup + unaccepted_neg_sup
+            for absorb=False:
+                fidelity = accepted_pos_prop + unaccepted_neg_prop
+
+            when class_balanced=True:
+                pos_sup (and pos_prop) are re-weighted to (total_samples) / (2 * positive_samples)
+                neg_sup (and neg_prop) are re-weighted to (total_samples) / (2 * negative_samples)
+
         Note:
             set class_balanced to true may cause great misbehavior of AdaAX.
 
-            For example, linking start and accepting state with '1' would cause magnificent fidelity loss,
-                as most examples, including those which started with '1' are negative samples.
+            For Tomita 4, linking start and accept states with '1' would cause magnificent fidelity loss,
+                as most samples, including those which started with '1' are negative samples.
 
                 However, when class_balanced=True, those positive samples are over-weighted to
                 (total_samples) / (2 * positive_samples), thus may not result in fidelity loss for this misbehavior.
         """
-        # Note that all expressions which is not accepted is classified as negative.
+
         pos_count, total_count = sum(rnn_loader.rnn_output), len(rnn_loader.rnn_output)
         neg_count = total_count - pos_count
 
         if self.absorb:
             mapping, missing = parse_tree_with_dfa(rnn_loader.prefix_tree.root, self.q0, self)
-            accepted_pos = sum([node.pos_sup for node in mapping[self.F]])
-            accepted_neg = sum([node.neg_sup for node in mapping[self.F]])
+            accepted_pos = sum([sum([node.pos_sup for node in mapping[state]]) for state in self.F])
+            accepted_neg = sum([sum([node.neg_sup for node in mapping[state]]) for state in self.F])
         else:
             mapping, missing = parse_tree_with_non_absorb_dfa(rnn_loader.prefix_tree.root, self.q0, self)
-            accepted_pos = sum([node.pos_prop for node in mapping[self.F]])
-            accepted_neg = sum([node.neg_prop for node in mapping[self.F]])
+            accepted_pos = sum([sum([node.pos_prop for node in mapping[state]]) for state in self.F])
+            accepted_neg = sum([sum([node.neg_prop for node in mapping[state]]) for state in self.F])
 
         if not class_balanced:
             return accepted_pos - accepted_neg + neg_count / total_count
         else:
             return total_count * accepted_pos / (2 * pos_count) - total_count * accepted_neg / (2 * neg_count) + .5
-        # assert abs(rnn_loader.prefix_tree.fidelity(accepted_sup) - rnn_loader.eval_fidelity(self)) < 1e-6
-        # return rnn_loader.eval_fidelity(self)
 
     def _check_absorbing(self):
+        """ Check if accept states have exiting transitions."""
         if self.absorb:
-            if self.F in self.delta.keys():
-                warnings.warn("Exiting transitions found in accepting state when absorb=True")
-                del self.delta[self.F]
+            for state in self.F:
+                if state in self.delta.keys():
+                    warnings.warn("Exiting transitions found in accept state when absorb=True")
+                    del self.delta[state]
 
     def _check_null_states(self):
-        reachable_states = {self.q0}
-        for state in self.delta.keys():
-            reachable_states.update(self.delta[state].values())
-        for state in self.Q:
-            if state not in reachable_states:
-                if state == self.F:
-                    raise RuntimeError("Accepting state unreachable.")
-                else:
-                    self.Q.remove(state)  # Remove unreachable state in dfa
-                    for prefix in state.prefixes:
-                        self._delete_prefix(state, prefix)
-                    if state in self.delta.keys():
-                        del self.delta[state]
+        """ Check if there are unreachable states."""
+        reachable_states, stack, visited = {self.q0}, [self.q0], []
 
-                    try:
-                        if state in self.A_t:
-                            self.A_t.remove(state)  # Remove in "states to be merged" queue for consistency
-                    except AttributeError:
-                        pass
+        while stack:
+            state = stack.pop()
+            visited.append(state)  # update visited
+            reachable_states.update(self.delta[state].values())  # update reachable states
+            for s in set(self.delta[state].values()):
+                if s not in visited and s not in stack:
+                    stack.append(s)
+
+        for state in self.Q.copy():
+            if state not in reachable_states:
+                if state in self.F:
+                    warnings.warn("Accept state unreachable.")
+                    self.F.remove(state)
+                self.Q.remove(state)  # Remove unreachable state in dfa
+                for prefix in state.prefixes:
+                    self._delete_prefix(state, prefix)
+                if state in self.delta.keys():
+                    del self.delta[state]
+                try:
+                    if state in self.A_t:
+                        self.A_t.remove(state)  # Remove state in "states to be merged" queue for consistency
+                except AttributeError:
+                    pass
 
     def _check_transition_consistency(self):
+        """ Unused. Maintained for consistency."""
         pass
 
     def _check_state_consistency(self):
+        """ Check if there are unrecognized states in transitions."""
         assert all([s in self.Q for s in self.delta.keys()]), "Transition table has unidentified parent state."
 
         for state in self.delta.keys():
@@ -160,6 +190,7 @@ class DFA:
                 "Transition table has unidentified child state."
 
     def _check_empty_transition(self):
+        """ Check if there is empty(null) children state in transitions."""
         to_delete_transitions, to_delete_states = [], []
 
         for state in self.delta.keys():
@@ -184,6 +215,7 @@ class DFA:
         Remove all children from this prefix."""
         if prefix not in state.prefixes:
             raise ValueError("Prefix %s doesn't belong to state." % prefix)
+
         stack = [(state, prefix)]
         while stack:
             state_, prefix_ = stack.pop()
@@ -197,56 +229,35 @@ class DFA:
 
     # todo: remove the usage of SimpleDFA and implement minimize, complete, trimming
     def to_simpledfa(self, minimize, trim):
+        """ Convert into pythomata.SimpleDFA for plot."""
         alphabet = set(self.alphabet)
-        states_mapping = {state: 'state' + str(i + 1) for i, state in enumerate(self.Q)}
+
+        # todo: q0 in F (start state among accept states)
+        states_mapping, count = {self.q0: 'Start'}, 1
+        states_mapping.update({state: 'Accept' + str(i + 1) for i, state in enumerate(self.F)})
+
+        for state in self.Q:
+            if state not in [self.q0] + self.F:
+                states_mapping.update({state: 'State' + str(count)})
+                count += 1
+
         states = set([states_mapping[state] for state in self.Q])
         initial_state = states_mapping[self.q0]
-        accepting_states = {states_mapping[self.F]}
-
+        accept_states = set(states_mapping[state] for state in self.F)
         transition_function = {states_mapping[state]: {symbol: states_mapping[
-            s] for symbol, s in self.delta[state].items()} for state in self.delta.keys()}  # if state != self.F
-        dfa = SimpleDFA(states, alphabet, initial_state, accepting_states, transition_function)
+            s] for symbol, s in self.delta[state].items()} for state in self.delta.keys()}
+        dfa = SimpleDFA(states, alphabet, initial_state, accept_states, transition_function)
 
-        # if minimize:
-        #     dfa = dfa.minimize()
-        # if trim:
-        #     dfa = dfa.trim()
+        if minimize:
+            dfa = dfa.minimize()
+        if trim:
+            dfa = dfa.trim()
 
         return dfa
 
-    def plot(self, fname, minimize=True, trim=True):
+    def plot(self, fname, minimize=False, trim=False):
         graph = self.to_simpledfa(minimize=minimize, trim=trim).to_graphviz()
         graph.render(filename=fname, format='png')
-
-    # todo: require testing
-    # def plot(self, fname, force=False, maximum=60):
-    #
-    #     edges = defaultdict(list)
-    #
-    #     for parent in self.delta.keys():
-    #         for s in self.delta[parent].keys():
-    #             child = self.delta[parent][s]
-    #             edges[(parent, child)] += [s]
-    #
-    #     if (not force) and len(self.Q) > maximum:
-    #         raise Warning('State number exceeds limit (Maximum %d).' % maximum)
-    #
-    #     state2int = {None: 0}
-    #
-    #     def _state2int(state):
-    #         if state not in state2int.keys():
-    #             state2int[state] = max(state2int.values()) + 1
-    #         return str(state2int[state])
-    #
-    #     g = digraph()
-    #     g = add_nodes(g, [(_state2int(self.q0), {'color': 'black', 'shape': 'hexagon', 'label': 'Start'})])
-    #     g = add_nodes(g, [(_state2int(state), {'color': 'black', 'label': str(_state2int(state))})
-    #                       for state in self.Q if state not in (self.q0, self.F)])
-    #     g = add_nodes(g, [(_state2int(self.F), {'color': 'green', 'shape': 'hexagon', 'label': 'Accept'})])
-    #
-    #     g = add_edges(g, [(e, {'label': SEP.join(edges[e])}) for e in edges.keys()])
-    #
-    #     display(Image(filename=g.render(filename=fname)))
 
 
 if __name__ == "__main__":
