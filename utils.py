@@ -63,8 +63,7 @@ class RNNLoader:
         self.vocab, self.alphabet = vocab, vocab.words
         self.input_sequences, self.hidden_states, self.rnn_prob_output = rnn_data
         self.rnn_output = self.rnn_prob_output.round()
-        self.decoded_input_seq = np.array([self.decode(
-            seq, remove_padding=False, as_list=True) for seq in self.input_sequences])
+        self.decoded_input_seq = [self.decode(seq, remove_padding=True, as_list=True) for seq in self.input_sequences]
         self.prefix_tree = PrefixTree4Fidelity(self.decoded_input_seq, self.hidden_states, self.rnn_output)
 
     def decode(self, seq, remove_padding=True, as_list=False, sep=' '):

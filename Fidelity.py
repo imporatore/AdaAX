@@ -92,11 +92,10 @@ class PrefixTree4Fidelity:
             else:
                 cur.neg_sup += self._neg_weight
 
-            if i == len(s) - 1 or s[i + 1] == '<PAD>':  # reached the end of a sample
-                if l:
-                    cur.pos_prop += self._prop
-                else:
-                    cur.neg_prop += self._prop
+        if l:
+            cur.pos_prop += self._prop
+        else:
+            cur.neg_prop += self._prop
 
 
 def parse_tree_with_dfa(node, state, dfa):
@@ -129,8 +128,6 @@ def parse_tree_with_dfa(node, state, dfa):
                 if n.val in dfa.delta[state_].keys():  # transition already in dfa
                     s = dfa.delta[state_][n.val]
                     stack.append((n, s))
-                elif n.val == '<pad>':  # reach the end of an expression (symbols all found but classified as negative)
-                    pass
                 else:  # either should be negative expression or positive expression misclassified (hasn't added)
                     missing_nodes.append(n)
 
@@ -164,8 +161,6 @@ def parse_tree_with_non_absorb_dfa(node, state, dfa):
             if n.val in dfa.delta[state_].keys():  # transition already in dfa
                 s = dfa.delta[state_][n.val]
                 stack.append((n, s))
-            elif n.val == '<pad>':  # reach the end of an expression (symbols all found)
-                pass
             else:  # either should be negative expression or positive expression misclassified (hasn't added)
                 missing_nodes.append(n)
 

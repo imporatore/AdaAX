@@ -6,7 +6,7 @@ from collections import deque
 
 import tqdm
 
-from config import POS_THRESHOLD, TAU, DELTA, DFA_DIR, IMAGE_DIR
+from config import POS_THRESHOLD, SAMPLE_THRESHOLD, TAU, DELTA, DFA_DIR, IMAGE_DIR
 from States import build_start_state
 from DFA import DFA
 from Pattern import PatternSampler
@@ -83,7 +83,7 @@ def build_dfa(loader, dfa, patterns, tau, delta):
                 # A_t is modified as an attribute of dfa so that it can be mapped while deepcopy
                 dfa, dfa_fidelity, dfa.A_t = new_dfa, new_dfa_fidelity, states_to_be_merged
             else:
-                print("Pattern %s unaccepted." % p)
+                print("Pattern %d: %s unaccepted." % (i, p))
                 continue
 
         while dfa.A_t:
@@ -97,7 +97,7 @@ def build_dfa(loader, dfa, patterns, tau, delta):
 
             # when absorb=True, start and accept states shouldn't be merged
             if not dfa.absorb or q_t not in [dfa.q0] + dfa.F:
-                neighbours = dfa.F + [dfa.q0] + neighbours
+                neighbours = [state for state in dfa.F + [dfa.q0] if state != q_t] + neighbours
             elif q_t in dfa.F:
                 neighbours = [state for state in dfa.F if state != q_t] + neighbours
 
@@ -109,6 +109,8 @@ def build_dfa(loader, dfa, patterns, tau, delta):
                     new_dfa, _ = merge_states(dfa, q_t, s)  # create the DFA after merging
                 except RuntimeError as message:  # Start state & accept states merged
                     if message.args[0] == "Start state & accept state merged for absorb=True DFA. Quit merging.":
+                        continue
+                    elif message.args[0] == "No accept state remains.":
                         continue
                     raise RuntimeError(message)
 
@@ -215,7 +217,8 @@ def main(config):
         os.makedirs(config.image_dir)
 
     loader = RNNLoader(config.fname, config.model)
-    pattern_sampler = PatternSampler(loader, pos_threshold=config.pos_threshold)
+    pattern_sampler = PatternSampler(loader, absorb=config.absorb, pos_threshold=config.pos_threshold,
+                                     sample_threshold=config.sample_threshold, return_sample=config.add_single_sample)
     start_state = build_start_state()
     dfa = DFA(loader.alphabet, start_state, config.absorb)
 
@@ -241,6 +244,8 @@ if __name__ == "__main__":
 
     # pattern parameters
     parser.add_argument("--pos_threshold", type=float, default=POS_THRESHOLD)
+    parser.add_argument("--sample_threshold", type=int, default=SAMPLE_THRESHOLD)
+    parser.add_argument("--add_single_sample", type=bool, default=False)
 
     # AdaAX parameters
     parser.add_argument("--absorb", type=bool, default=True)

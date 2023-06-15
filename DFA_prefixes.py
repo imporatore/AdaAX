@@ -166,6 +166,8 @@ class DFA:
                 if state in self.F:
                     warnings.warn("Accept state unreachable.")
                     self.F.remove(state)
+                    if not self.F:
+                        raise RuntimeError("No accept state remains.")
                 self.Q.remove(state)  # Remove unreachable state in dfa
                 for prefix in state.prefixes:
                     self._delete_prefix(state, prefix)
@@ -176,6 +178,9 @@ class DFA:
                         self.A_t.remove(state)  # Remove state in "states to be merged" queue for consistency
                 except AttributeError:
                     pass
+
+    def _check_accept_states(self):
+        assert all([state in self.Q for state in self.F]), "Accept states not found in states list."
 
     def _check_transition_consistency(self):
         """ Unused. Maintained for consistency."""
@@ -232,9 +237,23 @@ class DFA:
         """ Convert into pythomata.SimpleDFA for plot."""
         alphabet = set(self.alphabet)
 
-        # todo: q0 in F (start state among accept states)
-        states_mapping, count = {self.q0: 'Start'}, 1
-        states_mapping.update({state: 'Accept' + str(i + 1) for i, state in enumerate(self.F)})
+        if self.q0 in self.F:
+            if len(self.F) == 1:
+                states_mapping, count = {self.q0: 'Start & Accept'}, 1
+            else:
+                states_mapping, count, accept_count = {self.q0: 'Start & Accept1'}, 1, 2
+
+                for state in self.F:
+                    if state != self.q0:
+                        states_mapping.update({state: 'Accept' + str(accept_count)})
+                        accept_count += 1
+        else:
+            states_mapping, count = {self.q0: 'Start'}, 1
+
+            if len(self.F) == 1:
+                states_mapping.update({self.F[0]: 'Accept'})
+            else:
+                states_mapping.update({state: 'Accept' + str(i + 1) for i, state in enumerate(self.F)})
 
         for state in self.Q:
             if state not in [self.q0] + self.F:

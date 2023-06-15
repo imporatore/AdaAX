@@ -3,16 +3,40 @@ from collections import deque
 
 class PatternSampler:
 
-    def __init__(self, rnn_loader, pos_threshold):
+    def __init__(self, rnn_loader, absorb, pos_threshold, sample_threshold, return_sample):
         """
         Args:
             rnn_loader: RNNLoader
-            pos_threshold: float, threshold for positive patterns, default 0.95,
-                i.e. (pos_sup / (pos_sup + neg_sup)) > pos_threshold
+            absorb: bool, if this pattern is to build an absorb DFA,
+                and thence the pattern will (not) have an absorbing behavior.
+            pos_threshold: float, default 0.95, threshold for positive patterns, default 0.95,
+                i.e. pos_sup / (pos_sup + neg_sup) > pos_threshold
                 - should be adjusted for unbalanced dataset
+            sample_threshold: int, default 5, threshold for a positive pattern,
+                the minimum number of positive samples from this pattern,
+                i.e. pos_sup >= sample_threshold / total_samples
+            return_sample: bool, default False, if sampler yield single positive sample
+                - if True ana absorb=False, sampler will yield all positive samples in the dataset
+
+        Note:
+            two cases for a pattern yielded by pattern sampler
+            1. (if return_sample=True) all positive samples
+            2. positive patterns, iff
+               - pos_sup / (pos_sup + neg_sup) > pos_threshold
+               - pos_sup >= sample_threshold / total_samples
+
+            'absorb' will cause different behavior of patterns:
+            - for absorb=True DFA, whenever a positive pattern is reached,
+                the expression will be classified as positive,
+                thus no pattern will be other patterns' prefix
+            - for absorb=False DFA, an expression could be false even if it has a positive pattern as prefix.
+                Thus pattern sampler won't stop searching when positive patterns were met.
         """
         self.root = rnn_loader.prefix_tree.root
-        self.threshold = pos_threshold
+        self._absorb = absorb
+        self._threshold, self._sample_threshold = pos_threshold, sample_threshold
+        self._total_samples = rnn_loader.rnn_output.shape[0]
+        self._return_sample = return_sample
 
     def __iter__(self):
         """ Parse the tree using BFS (so that simpler/shorter patterns come first)
@@ -40,17 +64,35 @@ class PatternSampler:
         while queue:
             node, expr, hidden = queue.popleft()
 
-            if node.pos_sup / (node.pos_sup + node.neg_sup) >= self.threshold:
-                if node.val == '<pad>':  # only negative patterned
-                    assert expr[-2] != '<pad>'
-                    yield expr[:-1], hidden[:-1], (node.pos_sup, node.neg_sup)  # todo: sup incorrect
-                else:  # positive patterned or large positive support when negative patterned
+            if self._absorb:
+                if self._is_pos(node):
                     yield expr, hidden, (node.pos_sup, node.neg_sup)
-
-            else:  # todo: check (seems correct for both positive & negative patterns cases)
-                if node.val != '<pad>':  # negative sample when both positive patterned & negative patterned
+                else:
                     for n in node.next:
                         queue.append((n, expr + [n.val], hidden + [n.h]))
+            else:
+                if self._is_pos(node):
+                    yield expr, hidden, (node.pos_sup, node.neg_sup)
+                for n in node.next:
+                    queue.append((n, expr + [n.val], hidden + [n.h]))
+
+    def _is_positive_pattern(self, node):
+        if node.pos_sup / (node.pos_sup + node.neg_sup) >= self._threshold and node.pos_sup > \
+                self._sample_threshold / self._total_samples:
+            return True
+        return False
+
+    @staticmethod
+    def _is_positive_sample(node):
+        if node.pos_prop > 0:
+            return True
+        else:
+            return False
+
+    def _is_pos(self, node):
+        if not self._return_sample:
+            return self._is_positive_pattern(node)
+        return self._is_positive_pattern(node) or self._is_positive_sample(node)
 
 
 class PatternIterator:
@@ -96,8 +138,9 @@ if __name__ == "__main__":
 
     loader = RNNLoader('synthetic_data_1', 'gru')
 
-    pattern_sampler = PatternSampler(loader, pos_threshold=.95)
-    for p, _, sup in pattern_sampler:
-        print(p, sup)
+    pattern_sampler = PatternSampler(loader, absorb=False, pos_threshold=.95, sample_threshold=5, return_sample=False)
+    for i, res in enumerate(pattern_sampler):
+        p, _, _ = res
+        print("Pattern %d: %s." % (i + 1, p))
 
     pass

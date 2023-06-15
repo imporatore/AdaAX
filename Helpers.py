@@ -23,6 +23,11 @@ def check_consistency(dfa, check_transition=True, check_state=True, check_empty=
 
     dfa._check_absorbing()  # check if accept states have exiting transitions for DFA which absorb=True
 
+    try:
+        dfa._check_accept_states()
+    except AssertionError as message:
+        raise RuntimeError(message)
+
     if check_null_states:
         dfa._check_null_states()
 

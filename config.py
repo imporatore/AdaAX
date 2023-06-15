@@ -29,18 +29,8 @@ START_SYMBOL = '<START>'  # todo: modify the code for a None START_SYMBOL when w
 START_PREFIX = [START_SYMBOL] if START_SYMBOL else []
 
 # ----------------------------- AdaAX parameter ------------------------------------
-# todo: add command line arguments
-# todo: auto select cluster num
-# Parameters:
-# Cluster_id: -1, 0, 1, 2, ... , C-1 (-1 is start state)
-K = 10  # Initial cluster numbers, determined by elbow method
-# THETA = 0.005  # Threshold for pruning
-THETA = 0.
 POS_THRESHOLD = .95  # threshold for an expression be considered a positive pattern
-TAU = 1.  # Threshold for neighbour distance
-# TAU = 3.
-# DELTA = 0.001  # Threshold for merging fidelity loss
-DELTA = 0.0001
+SAMPLE_THRESHOLD = 5  # sample threshold for positive patterns
 
-# Plot
-SEP = ", "
+TAU = 1.  # Threshold for neighbour distance
+DELTA = 0.0001  # Threshold for merging fidelity loss

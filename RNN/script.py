@@ -25,7 +25,7 @@ synthetic2_config = {"fname": "synthetic_data_2",
                      "hidden_size": 16,
                      "embedding_size": 16,
                      "total_epoch": 10,  # 5
-                     "learning_rate": 0.01}  # 0.005
+                     "learning_rate": 0.005}
 
 tomita1_config = {"fname": "tomita_data_1",
                   "hidden_size": 32,
@@ -74,19 +74,19 @@ def run(name, type, config=None):
 
 
 if __name__ == "__main__":
-    run('synthetic1', 'rnn', {"total_epoch": 10})
-    run('synthetic1', 'lstm')
-    run('synthetic1', 'gru')
-    run('synthetic2', 'rnn')
-    run('synthetic2', 'lstm', {"total_epoch": 10, "learning_rate": 0.005})
-    run('synthetic2', 'gru', {"total_epoch": 10, "learning_rate": 0.005})
-    run('tomita1', 'rnn', {"total_epoch": 10})
-    run('tomita1', 'lstm')
-    run('tomita1', 'gru')
-    # run('tomita2', 'rnn')
-    # run('tomita2', 'lstm')
-    # run('tomita2', 'gru')
-    run('yelp', 'rnn')
-    run('yelp', 'lstm')
-    run('yelp', 'gru')
+    # run('synthetic1', 'rnn', {"total_epoch": 10})
+    # run('synthetic1', 'lstm')
+    # run('synthetic1', 'gru')
+    run('synthetic2', 'rnn')  # ERROR: all 0 output
+    # run('synthetic2', 'lstm')
+    # run('synthetic2', 'gru')
+    # run('tomita1', 'rnn')
+    # run('tomita1', 'lstm')
+    # run('tomita1', 'gru')
+    # # run('tomita2', 'rnn')  # ERROR
+    # # run('tomita2', 'lstm')  # ERROR
+    # # run('tomita2', 'gru')  # ERROR
+    # run('yelp', 'rnn')
+    # run('yelp', 'lstm')
+    # run('yelp', 'gru')
     pass
