@@ -1,5 +1,5 @@
 from config import DFA_DIR, IMAGE_DIR, POS_THRESHOLD, SAMPLE_THRESHOLD, TAU, DELTA
-from utils import ConfigDict
+from Helpers import ConfigDict
 from AdaAX import main
 
 
@@ -13,21 +13,24 @@ synthetic1_config = {"fname": "synthetic_data_1",
                      "sample_threshold": 5,
                      "neighbour": 1.,
                      "fidelity_loss": 0.,
-                     "absorb": True}
+                     "absorb": True,
+                     "class_balanced": False}
 
 synthetic2_config = {"fname": "synthetic_data_2",
                      "pos_threshold": .95,
                      "sample_threshold": 5,
                      "neighbour": 1.5,
                      "fidelity_loss": 0.,
-                     "absorb": True}
+                     "absorb": True,
+                     "class_balanced": False}
 
 tomita1_config = {"fname": "tomita_data_1",
                   "pos_threshold": .95,
                   "sample_threshold": 2,
                   "neighbour": 3.,
                   "fidelity_loss": 0.,
-                  "absorb": False}
+                  "absorb": False,
+                  "class_balanced": False}
 
 tomita2_config = {}
 
@@ -36,7 +39,8 @@ yelp_config = {"fname": "yelp_review_balanced",
                "sample_threshold": SAMPLE_THRESHOLD,
                "neighbour": TAU,
                "fidelity_loss": DELTA,
-               "absorb": False}
+               "absorb": False,
+               "class_balanced": False}
 
 
 def run(name, type, config=None):
@@ -74,12 +78,12 @@ if __name__ == "__main__":
     # run('synthetic1', 'rnn')  # todo: MINOR MISTAKE (seems RNN mistake)
     # run('synthetic1', 'lstm')
     # run('synthetic1', 'gru')
-    # run('synthetic2', 'rnn')  # todo: MINOR MISTAKE
-    # run('synthetic2', 'lstm')
-    # run('synthetic2', 'gru')
+    run('synthetic2', 'rnn')  # todo: MINOR MISTAKE
+    run('synthetic2', 'lstm')
+    run('synthetic2', 'gru')
     # run('tomita1', 'rnn')
     # run('tomita1', 'lstm')
-    run('tomita1', 'gru')
+    # run('tomita1', 'gru', {"add_single_sample": True})
     # run('tomita2', 'rnn')
     # run('tomita2', 'lstm')
     # run('tomita2', 'gru')

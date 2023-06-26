@@ -1,5 +1,5 @@
-from collections import defaultdict
 import warnings
+from collections import defaultdict
 
 from pythomata import SimpleDFA  # help trimming, minimizing & plotting
 

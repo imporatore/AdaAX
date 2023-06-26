@@ -10,8 +10,8 @@ from config import POS_THRESHOLD, SAMPLE_THRESHOLD, TAU, DELTA, DFA_DIR, IMAGE_D
 from States_prefixes import build_start_state
 from DFA_prefixes import DFA
 from Pattern import PatternSampler
-from utils import d, RNNLoader
-from Helpers import substitute, check_consistency
+from utils import RNNLoader
+from Helpers import d, substitute, check_consistency
 from data.utils import save2pickle
 
 
@@ -146,7 +146,7 @@ def merge_states(dfa, state1, state2, inplace=False):
         mapping: dict, the mapping from the states of dfa to the corresponding states of new dfa
     """
     # todo: the hidden state values remains after merging
-    new_dfa = copy.deepcopy(dfa) if not inplace else dfa
+    new_dfa = copy.copy(dfa) if not inplace else dfa
     mapping = {s: ns for s, ns in zip(dfa.Q, new_dfa.Q)}
     mapped_state1, mapped_state2 = mapping[state1], mapping[state2]
 

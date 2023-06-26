@@ -86,7 +86,7 @@ class ForwardTransition(WrappedDict):
         self._items.__setitem__(key, value)
         # update backward transition
         if self.__state not in self.__table.backward[value][key]:
-            self.__table.backward[value][key].append(self.__state)
+            self.__table.backward[value][key].add(self.__state)
 
     def __missing__(self, key):
         """ Called when key missing in self._items[key]. Return None."""
@@ -107,7 +107,7 @@ class BackwardTransition(WrappedDict):
 
     def __missing__(self, key):
         """ Called when key missing in self._items[key]. Set the value (parents) to an empty list [] and return."""
-        self._items[key] = list()
+        self._items[key] = set()
         return self._items.__getitem__(key)
 
     def __len__(self):
@@ -171,7 +171,7 @@ class TransitionTable:  # todo: __new__
         Deprecated."""
         self.forward.__setitem__(key, value)
         for symbol, state in value.items():
-            self.backward[state][symbol].append(key)
+            self.backward[state][symbol].add(key)
 
     def __len__(self):
         """ Count of all forward transitions (the num of backward transitions are the same)."""
@@ -180,6 +180,14 @@ class TransitionTable:  # todo: __new__
     def keys(self):
         """ States in the forward transition table."""
         return self.forward.keys()
+
+    def values(self):
+        """ Transitions in the forward transition table."""
+        return self.forward.values()
+
+    def items(self):
+        """ Items in the forward transition table."""
+        return self.forward.items()
 
     def get(self, *args, **kwargs):
         """ 'Get' method of the forward transition table."""
@@ -232,6 +240,13 @@ class TransitionTable:  # todo: __new__
                 del self.backward[state][symbol]
                 if not self.backward[state]:
                     del self.backward[state]
+
+    def copy_by_mapping(self, mapping):
+        new_table = TransitionTable()
+        for state in self.forward.keys():
+            for s in self.forward[state].keys():
+                new_table[mapping[state]][s] = mapping[self.forward[state][s]]
+        return new_table
 
     def _check_transition_consistency(self):
         """ Check consistency of forward and backward transitions by edges.

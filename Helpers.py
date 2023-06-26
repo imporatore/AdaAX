@@ -1,14 +1,9 @@
 from functools import wraps
 
-
-def substitute(lst: list, element1, element2):
-    """ Substitute element1 with element2 in list lst."""
-    if element1 in lst:
-        lst.remove(element1)
-        if element2 not in lst:
-            lst.append(element2)
+import numpy as np
 
 
+# -------------------------------- Checks ---------------------------------------
 # todo: examine the order of these ops
 def check_consistency(dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True):
     """ Consistency check of DFA.
@@ -30,6 +25,11 @@ def check_consistency(dfa, check_transition=True, check_state=True, check_empty=
 
     if check_null_states:
         dfa._check_null_states()
+
+    try:
+        dfa._check_state_node_mapping()
+    except AssertionError as message:
+        raise RuntimeError(message)
 
     if check_transition:
         try:
@@ -73,3 +73,57 @@ class ConsistencyCheck:
             return __wrapper
 
         return _consistency_check
+
+
+# ---------------------------- math --------------------------------
+
+def d(hidden1: np.array, hidden2: np.array):
+    """ Euclidean distance of hidden state values."""
+    return np.sqrt(np.sum((hidden1 - hidden2) ** 2))
+
+
+# ------------------------- graphviz -------------------------------
+
+def add_nodes(graph, nodes):
+    for n in nodes:
+        if isinstance(n, tuple):
+            graph.node(n[0], **n[1])
+        else:
+            graph.node(n)
+    return graph
+
+
+def add_edges(graph, edges):
+    for e in edges:
+        if isinstance(e[0], tuple):
+            graph.edge(*e[0], **e[1])
+        else:
+            graph.edge(*e)
+    return graph
+
+
+# ------------------------------ helper functions -------------------------
+
+def substitute(container, element1, element2):
+    """ Substitute element1 with element2 in container."""
+    if element1 in container:
+        container.remove(element1)
+        if element2 not in container:
+            if isinstance(container, list):
+                container.append(element2)
+            elif isinstance(container, set):
+                container.add(element2)
+
+
+class ConfigDict:
+    """ Helper class for configuration."""
+
+    def __init__(self, config_dict: dict):
+        # config_dict: a dict object holding configurations
+        self.config = config_dict
+
+    def __getattr__(self, item):
+        return self.config[item]
+
+    def update(self, new_config):
+        self.config.update(new_config)

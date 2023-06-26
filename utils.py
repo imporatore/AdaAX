@@ -4,9 +4,9 @@ import functools
 
 import numpy as np
 
+from Fidelity import PrefixTree4Fidelity
 from config import RNN_RESULT_DIR, VOCAB_DIR
 from data.utils import load_npy, load_pickle
-from Fidelity import PrefixTree4Fidelity
 
 
 # --------------------------------------- Pipeline ---------------------------------------
@@ -74,39 +74,19 @@ class RNNLoader:
             return text
         return sep.join(text)
 
+    @property
+    def counts(self):
+        """ Return positive sample counts, negative sample counts, total sample counts."""
+        pos_count, total_count = sum(self.rnn_output), len(self.rnn_output)
+        neg_count = total_count - pos_count
+        return pos_count, neg_count, total_count
+
     def eval_fidelity(self, dfa):
         """ Evaluate the fidelity of (extracted) DFA from rnn_loader.
 
         Rather slow. Should only be used for test."""
         return np.mean([dfa.classify_expression(self.decode(expr, as_list=True)) == ro
                         for expr, ro in zip(self.input_sequences, self.rnn_output)])
-
-
-# ---------------------------- math --------------------------------
-
-def d(hidden1: np.array, hidden2: np.array):
-    """ Euclidean distance of hidden state values."""
-    return np.sqrt(np.sum((hidden1 - hidden2) ** 2))
-
-
-# ------------------------- graphviz -------------------------------
-
-def add_nodes(graph, nodes):
-    for n in nodes:
-        if isinstance(n, tuple):
-            graph.node(n[0], **n[1])
-        else:
-            graph.node(n)
-    return graph
-
-
-def add_edges(graph, edges):
-    for e in edges:
-        if isinstance(e[0], tuple):
-            graph.edge(*e[0], **e[1])
-        else:
-            graph.edge(*e)
-    return graph
 
 
 # ---------------------------- logger & timer ---------------------------------
@@ -151,20 +131,6 @@ class LazyAttribute(object):
         value = self.getter(cls)
         setattr(cls, self.__name__, value)
         return value
-
-
-class ConfigDict:
-    """ Helper class for configuration."""
-
-    def __init__(self, config_dict: dict):
-        # config_dict: a dict object holding configurations
-        self.config = config_dict
-
-    def __getattr__(self, item):
-        return self.config[item]
-
-    def update(self, new_config):
-        self.config.update(new_config)
 
 
 if __name__ == "__main__":

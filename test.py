@@ -3,7 +3,7 @@ import os
 from config import DFA_DIR, IMAGE_DIR
 from States import build_start_state
 from DFA import DFA
-from Pattern import PatternIterator
+from Pattern import PatternInputer
 
 
 PATH = r'C:\PycharmProjects\AdaAX\AdaAX-main\synthetic\input.txt'
@@ -20,9 +20,9 @@ if __name__ == "__main__":
 
     patterns = [expr.split(',')[1:-1] for expr in open(PATH, 'r')]
     # Line 79 ~ Line 83 in input.txt is not a positive pattern
-    patterns_iter = PatternIterator(loader, patterns)
+    patterns_iter = PatternInputer(loader, patterns)
 
-    dfa = build_dfa(loader, dfa, patterns_iter, tau=1., delta=0.)
+    dfa = build_dfa(loader, dfa, patterns_iter, tau=1., delta=0., class_balanced=False)
 
     save2pickle(DFA_DIR, dfa, "{}_{}".format(fname, model))
 

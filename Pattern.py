@@ -56,25 +56,26 @@ class PatternSampler:
             No pattern is another patterns' prefix (?)
 
         Return:
+            nodes: list[Node], list of nodes of the positive pattern
             expr: list, list of symbols, positive patterns
             hidden: list, list of hidden values in expr
             sup: tuple(float, float), positive and negative support of the pattern
         """
-        queue = deque([(self.root, [], [])])
+        queue = deque([(self.root, [], [], [])])
         while queue:
-            node, expr, hidden = queue.popleft()
+            node, nodes, expr, hidden = queue.popleft()
 
             if self._absorb:
                 if self._is_pos(node):
-                    yield expr, hidden, (node.pos_sup, node.neg_sup)
+                    yield nodes, expr, hidden, (node.pos_sup, node.neg_sup)
                 else:
                     for n in node.next:
-                        queue.append((n, expr + [n.val], hidden + [n.h]))
+                        queue.append((n, nodes + [n], expr + [n.val], hidden + [n.h]))
             else:
                 if self._is_pos(node):
-                    yield expr, hidden, (node.pos_sup, node.neg_sup)
+                    yield nodes, expr, hidden, (node.pos_sup, node.neg_sup)
                 for n in node.next:
-                    queue.append((n, expr + [n.val], hidden + [n.h]))
+                    queue.append((n, nodes + [n], expr + [n.val], hidden + [n.h]))
 
     def _is_positive_pattern(self, node):
         if node.pos_sup / (node.pos_sup + node.neg_sup) >= self._threshold and node.pos_sup > \
@@ -95,7 +96,7 @@ class PatternSampler:
         return self._is_positive_pattern(node) or self._is_positive_sample(node)
 
 
-class PatternIterator:
+class PatternInputer:
     """ Simple iterator for testing external patterns."""
 
     def __init__(self, rnn_loader, patterns, support=None):
@@ -115,22 +116,24 @@ class PatternIterator:
     def __iter__(self):
         """
         Return:
+            nodes: list[Node], list of nodes of the positive pattern
             pattern: list, list of symbols, external patterns which can be found in the rnn_loader
             hidden: list, list of hidden values of the pattern
             support: tuple(float, float), positive and negative support of the pattern
         """
         for pattern, support in zip(self.patterns, self.support):
-            cur, hidden = self.root, []
+            cur, nodes, hidden = self.root, [], []
             for symbol in pattern:
                 for n in cur.next:
                     if n.val == symbol:
                         cur = n
+                        nodes.append(cur)
                         hidden.append(cur.h)
                         break
                 else:
                     break
             if len(hidden) == len(pattern):
-                yield pattern, hidden, support
+                yield nodes, pattern, hidden, support
 
 
 if __name__ == "__main__":
@@ -138,9 +141,9 @@ if __name__ == "__main__":
 
     loader = RNNLoader('synthetic_data_1', 'gru')
 
-    pattern_sampler = PatternSampler(loader, absorb=False, pos_threshold=.95, sample_threshold=5, return_sample=False)
+    pattern_sampler = PatternSampler(loader, absorb=False, pos_threshold=.95, sample_threshold=5, return_sample=True)
     for i, res in enumerate(pattern_sampler):
-        p, _, _ = res
+        _, p, _, _ = res
         print("Pattern %d: %s." % (i + 1, p))
 
     pass

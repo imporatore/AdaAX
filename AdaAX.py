@@ -2,7 +2,8 @@ import os
 import copy
 import argparse
 import warnings
-from collections import deque
+from collections import deque, defaultdict
+from typing import Tuple
 
 import tqdm
 
@@ -10,20 +11,21 @@ from config import POS_THRESHOLD, SAMPLE_THRESHOLD, TAU, DELTA, DFA_DIR, IMAGE_D
 from States import build_start_state
 from DFA import DFA
 from Pattern import PatternSampler
-from utils import d, RNNLoader
-from Helpers import substitute, check_consistency
+from utils import RNNLoader
+from Helpers import d, substitute, check_consistency
 from data.utils import save2pickle
 
 
-# todo: if the merging stage is cooperated in the adding stage, would it be faster?
-# todo: explicitly recalculate fidelity after adding a pattern using parsed result (mapping, missing)
-def add_pattern(dfa, p, h):
+# todo: if the merging stage is cooperated in the adding stage, would it be faster? (Yes, as it may use existing links)
+# todo: (No, as I have already adopted a bottom-up merging order)
+def add_pattern(dfa: DFA, n, p, h):
     """ Add new pattern to DFA,
 
     return a new dfa added the pattern (so that abnormal pattern which cause magnificent fidelity loss can be rejected).
 
     Args:
         dfa: DFA
+        n: list[Node], list of nodes
         p: list, pattern is a list of symbols
         h: list, list of hidden values of each prefix in p
 
@@ -31,57 +33,72 @@ def add_pattern(dfa, p, h):
         new_dfa: DFA, new dfa which added the pattern
         Q_new: list, new states (pure sets) added by the pattern
     """
-    new_dfa = copy.deepcopy(dfa)
+    new_dfa = copy.copy(dfa)
     q1 = new_dfa.q0
     Q_new = deque()  # New pure sets to add
 
     for i, s in enumerate(p):
-        if s in new_dfa.delta[q1].keys():
+        if s in new_dfa.delta[q1].keys():  # exist transitions
             q1 = new_dfa.delta[q1][s]
             # for absorb=True DFAs, no following transitions after accept states reached
-            if new_dfa.absorb and q1 in new_dfa.F:
-                return new_dfa, Q_new
+            if q1 in new_dfa.F and new_dfa.absorb:
+                return new_dfa, Q_new, None
         else:
             # add new states for missing transitions of a pattern
             q1 = new_dfa.add_new_state(p[:i + 1], h[i], prev=q1)
+            new_dfa.mapping.update({q1: {n[i]}})
+            # new_dfa.missing.remove(n[i])
+            # new_dfa.missing.update(n[i].next)
             Q_new.append(q1)
 
-    if q1 not in new_dfa.F:
+    if q1 not in new_dfa.F:  # last node unaccepted
         if len(Q_new) == 0:  # all transitions found, but hasn't reached accept states
             warnings.warn("Try accept existing states for pattern %s." % p)
-        new_dfa.F.append(q1)  # add new accept states
+        new_dfa.F.add(q1)  # add new accept states=
+        return new_dfa, Q_new, q1
 
-    return new_dfa, Q_new
+    return new_dfa, Q_new, None
 
 
-def build_dfa(loader, dfa, patterns, tau, delta):
-    """ Build DFA using extracted patterns.
+def build_dfa(loader: RNNLoader, dfa: DFA, patterns, tau, delta, class_balanced):
+    """ Build DFA using extracted patterns. Supports incremental update.
 
     Args:
         loader: RNNLoader
         dfa: DFA
         patterns: Iterable, pattern iterator which yields Tuple(pattern, hidden, support)
+        class_balanced: bool, default=False, whether to calculate fidelity using class balanced weights
 
     Params:
         tau: float, threshold for neighbour distance (Euclidean distance of hidden values)
         delta: float, threshold for merging fidelity loss
+
+    Note:
+        Mapping & missing is tracked and updated explicitly during both the add pattern and consolidation process.
     """
 
-    dfa_fidelity = dfa.fidelity(loader)
+    if len(dfa.delta) == 0:  # initialize mapping & missing
+        dfa.mapping.update({dfa.q0: {loader.prefix_tree.root}})
+        # dfa.missing.update(loader.prefix_tree.root.next)
+    else:  # incremental update a dfa
+        # dfa.mapping, dfa.missing = dfa.parse_tree(loader.prefix_tree.root, dfa.q0)
+        dfa.mapping = defaultdict(set, dfa.parse_tree(loader.prefix_tree.root, dfa.q0))
+    dfa.fidelity = dfa.eval_fidelity(loader, class_balanced)  # initialize fidelity
 
     for i, res in enumerate(tqdm.tqdm(patterns)):
-        p, h, _ = res  # (pattern, hidden, support)
+        nodes, p, h, _ = res  # (nodes, pattern, hidden, support)
 
-        new_dfa, states_to_be_merged = add_pattern(dfa, p, h)
+        new_dfa, states_to_be_merged, new_accept = add_pattern(dfa, nodes, p, h)
 
-        if not states_to_be_merged and len(new_dfa.F) == len(dfa.F):
+        if not states_to_be_merged and not new_accept:
             # print("Pattern %d already accepted. Pass." % (i + 1))
             continue
         else:
-            new_dfa_fidelity = new_dfa.fidelity(loader)
-            if new_dfa_fidelity >= dfa_fidelity:  # only accept patterns which increase fidelity
+            for node in new_dfa.mapping[new_accept]:
+                new_dfa.update_node_fidelity(loader, node, class_balanced)
+            if new_dfa.fidelity >= dfa.fidelity:  # only accept patterns which increase fidelity
                 # A_t is modified as an attribute of dfa so that it can be mapped while deepcopy
-                dfa, dfa_fidelity, dfa.A_t = new_dfa, new_dfa_fidelity, states_to_be_merged
+                dfa, dfa.A_t = new_dfa, states_to_be_merged
             else:
                 print("Pattern %d: %s unaccepted." % (i, p))
                 continue
@@ -90,14 +107,14 @@ def build_dfa(loader, dfa, patterns, tau, delta):
 
             q_t = dfa.A_t.popleft()  # pop elder states first for better performance
             if q_t != dfa.q0:
-                N_t = {s: d(q_t.h, s.h) for s in dfa.Q if s not in [q_t, dfa.q0] + dfa.F}  # neighbours of q_t
+                N_t = {s: d(q_t.h, s.h) for s in dfa.Q if s not in dfa.F.union({q_t, dfa.q0})}  # neighbours of q_t
             else:
-                N_t = {s: 0 for s in dfa.Q if s not in [dfa.q0] + dfa.F}
+                N_t = {s: 0 for s in dfa.Q if s not in dfa.F.union({dfa.q0})}
             neighbours = sorted(N_t.keys(), key=lambda x: N_t[x])
 
             # when absorb=True, start and accept states shouldn't be merged
-            if not dfa.absorb or q_t not in [dfa.q0] + dfa.F:
-                neighbours = [state for state in dfa.F + [dfa.q0] if state != q_t] + neighbours
+            if not dfa.absorb or q_t not in dfa.F.union({dfa.q0}):
+                neighbours = [state for state in dfa.F.union({dfa.q0}) if state != q_t] + neighbours
             elif q_t in dfa.F:
                 neighbours = [state for state in dfa.F if state != q_t] + neighbours
 
@@ -114,22 +131,23 @@ def build_dfa(loader, dfa, patterns, tau, delta):
                         continue
                     raise RuntimeError(message)
 
-                new_dfa_fidelity = new_dfa.fidelity(loader)
+                new_dfa.fidelity = new_dfa.eval_fidelity(loader, class_balanced)
                 # accept merging if fidelity loss below threshold
-                if dfa_fidelity - new_dfa_fidelity <= delta:
-                    print("Merged: dfa fidelity %f; new dfa fidelity %f" % (dfa_fidelity, new_dfa_fidelity))
-                    dfa, dfa_fidelity = new_dfa, new_dfa_fidelity
+                if dfa.fidelity - new_dfa.fidelity <= delta:
+                    print("Pattern %d Merged: dfa fidelity %f; new dfa fidelity %f" %
+                          (i + 1, dfa.fidelity, new_dfa.fidelity))
+                    dfa = new_dfa
                     break
 
-        print("Pattern %d, current fidelity: %f" % (i + 1, dfa_fidelity))
+        print("Pattern %d, current fidelity: %f" % (i + 1, dfa.fidelity))
 
     check_consistency(dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True)
-    print("Finished, extracted DFA fidelity: %f." % dfa.fidelity(loader))
+    print("Finished, extracted DFA fidelity: %f." % dfa.eval_fidelity(loader, class_balanced))
 
     return dfa
 
 
-def merge_states(dfa, state1, state2, inplace=False):
+def merge_states(dfa: DFA, state1, state2, inplace=False) -> Tuple[DFA, dict]:
     """ Try merging state1 with state2 for given DFA.
 
     Notice that if the child states not consistent, they will also be merged.
@@ -144,11 +162,27 @@ def merge_states(dfa, state1, state2, inplace=False):
     Returns:
         new_dfa: DFA, new DFA after merging state1 with state2 in the existing DFA
         mapping: dict, the mapping from the states of dfa to the corresponding states of new dfa
+
+    Notes:
+        Four cases:
+        1. State 1 has outgoing symbol 's' while state 2 does not
+        2. State 2 has outgoing symbol 's' while state 1 does not
+        3. State 1 has common outgoing symbol 's' with state 2, and child state the same
+        4. State 1 has common outgoing symbol 's' with state 2, and child state not the same
     """
     # todo: the hidden state values remains after merging
-    new_dfa = copy.deepcopy(dfa) if not inplace else dfa
+    new_dfa = copy.copy(dfa) if not inplace else dfa
     mapping = {s: ns for s, ns in zip(dfa.Q, new_dfa.Q)}
     mapped_state1, mapped_state2 = mapping[state1], mapping[state2]
+
+    # update accept mapping for absorb=True DFA
+    if new_dfa.absorb:
+        if state1 in dfa.F and state2 not in dfa.F:
+            for node in new_dfa.mapping[mapped_state2].copy():
+                new_dfa.remove_descendants(node, mapped_state2)
+        if state2 in dfa.F and state1 not in dfa.F:
+            for node in new_dfa.mapping[mapped_state1].copy():
+                new_dfa.remove_descendants(node, mapped_state1)
 
     # Update start and accept states if merged.
     if state1 == dfa.q0:
@@ -166,6 +200,10 @@ def merge_states(dfa, state1, state2, inplace=False):
     # update state list
     new_dfa.Q.remove(mapped_state1)
     mapping[state1] = mapped_state2
+
+    # update state-nodes mapping
+    state_1_nodes = new_dfa.mapping.pop(mapped_state1)
+    new_dfa.mapping[mapped_state2].update(state_1_nodes)
 
     # update transition table
     forward, backward = new_dfa.delta.pop(mapped_state1)
@@ -202,6 +240,21 @@ def merge_states(dfa, state1, state2, inplace=False):
                 for s in forward.keys():
                     forward[s] = mapping_[forward[s]]
 
+    # update descendant mapping
+    if not new_dfa.absorb or mapped_state2 not in new_dfa.F:
+
+        for node in new_dfa.mapping[mapped_state2].copy():
+            for n in node.next:
+                # parse unfounded nodes with newly built transitions
+                if n.val in new_dfa.delta[mapped_state2].keys():
+                    state = new_dfa.delta[mapped_state2][n.val]
+                    if n not in new_dfa.mapping[state]:
+                        # new_dfa.missing.remove(n)
+                        # mapping, missing = new_dfa.parse_tree(n, state)
+                        # new_dfa.update_mapping(mapping, missing)
+                        state2nodes = new_dfa.parse_tree(n, state)
+                        new_dfa.update_mapping(state2nodes)
+
     if not inplace:  # Only check consistency when all merging is done
         check_consistency(new_dfa, check_transition=True, check_state=True, check_empty=True, check_null_states=True)
 
@@ -222,7 +275,7 @@ def main(config):
     start_state = build_start_state()
     dfa = DFA(loader.alphabet, start_state, config.absorb)
 
-    dfa = build_dfa(loader, dfa, pattern_sampler, config.neighbour, config.fidelity_loss)
+    dfa = build_dfa(loader, dfa, pattern_sampler, config.neighbour, config.fidelity_loss, config.class_balanced)
 
     save2pickle(config.dfa_dir, dfa, "{}_{}".format(config.fname, config.model))
 
@@ -249,6 +302,7 @@ if __name__ == "__main__":
 
     # AdaAX parameters
     parser.add_argument("--absorb", type=bool, default=True)
+    parser.add_argument("--class_balanced", type=bool, default=False)
     parser.add_argument("--neighbour", type=float, default=TAU)
     parser.add_argument("--fidelity_loss", type=float, default=DELTA)
 

@@ -1,7 +1,7 @@
 from collections import defaultdict
 
 
-class SymbolNode4Fidelity(object):
+class SymbolNode4Fidelity:
     """ Symbol node with support and (sample) proportion."""
 
     def __init__(self, val):
@@ -119,19 +119,21 @@ def parse_tree_with_dfa(node, state, dfa):
     assert dfa.absorb is True, "This parsing is for DFA which absorb=True."
 
     stack = [(node, state)]
-    state2nodes, missing_nodes = defaultdict(list), []
+    # state2nodes, missing_nodes = defaultdict(set), set()
+    state2nodes = defaultdict(set)
     while stack:
         node_, state_ = stack.pop()
-        state2nodes[state_].append(node_)
+        state2nodes[state_].add(node_)
         if state_ not in dfa.F:  # accept states reached
             for n in node_.next:
                 if n.val in dfa.delta[state_].keys():  # transition already in dfa
                     s = dfa.delta[state_][n.val]
                     stack.append((n, s))
-                else:  # either should be negative expression or positive expression misclassified (hasn't added)
-                    missing_nodes.append(n)
+                # else:  # either should be negative expression or positive expression misclassified (hasn't added)
+                #     missing_nodes.add(n)
 
-    return state2nodes, missing_nodes
+    # return state2nodes, missing_nodes
+    return state2nodes
 
 
 def parse_tree_with_non_absorb_dfa(node, state, dfa):
@@ -153,18 +155,20 @@ def parse_tree_with_non_absorb_dfa(node, state, dfa):
     assert dfa.absorb is False, "DFA which absorb=True should use parse_tree_with_dfa."
 
     stack = [(node, state)]
-    state2nodes, missing_nodes = defaultdict(list), []
+    # state2nodes, missing_nodes = defaultdict(set), set()
+    state2nodes = defaultdict(set)
     while stack:
         node_, state_ = stack.pop()
-        state2nodes[state_].append(node_)
+        state2nodes[state_].add(node_)
         for n in node_.next:
             if n.val in dfa.delta[state_].keys():  # transition already in dfa
                 s = dfa.delta[state_][n.val]
                 stack.append((n, s))
-            else:  # either should be negative expression or positive expression misclassified (hasn't added)
-                missing_nodes.append(n)
+            # else:  # either should be negative expression or positive expression misclassified (hasn't added)
+            #     missing_nodes.add(n)
 
-    return state2nodes, missing_nodes
+    # return state2nodes, missing_nodes
+    return state2nodes
 
 
 if __name__ == "__main__":
