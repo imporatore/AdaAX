@@ -1,5 +1,5 @@
 from config import RNN_MODEL_DIR, RNN_RESULT_DIR
-from utils import ConfigDict
+from Helpers import ConfigDict
 from main import main
 
 
@@ -8,9 +8,9 @@ DEFAULT_CONFIG = {"model_dir": RNN_MODEL_DIR,
                   "dropout_rate": 0.5,
                   "batch_size": 100,
                   # "start_symbol": START_SYMBOL,
-                  "load_vocab": False,
+                  "load_vocab": True,
                   "save_vocab": True,
-                  "load_loader": False,
+                  "load_loader": True,
                   "save_loader": True,
                   "load_model": False,
                   "need_train": True}
@@ -74,10 +74,10 @@ def run(name, type, config=None):
 
 
 if __name__ == "__main__":
-    # run('synthetic1', 'rnn', {"total_epoch": 10})
-    # run('synthetic1', 'lstm')
-    # run('synthetic1', 'gru')
-    run('synthetic2', 'rnn')  # ERROR: all 0 output
+    run('synthetic1', 'rnn', {"total_epoch": 10})
+    run('synthetic1', 'lstm')
+    run('synthetic1', 'gru')
+    # run('synthetic2', 'rnn')  # ERROR: all 0 output
     # run('synthetic2', 'lstm')
     # run('synthetic2', 'gru')
     # run('tomita1', 'rnn')

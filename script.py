@@ -78,12 +78,12 @@ if __name__ == "__main__":
     # run('synthetic1', 'rnn')  # todo: MINOR MISTAKE (seems RNN mistake)
     # run('synthetic1', 'lstm')
     # run('synthetic1', 'gru')
-    run('synthetic2', 'rnn')  # todo: MINOR MISTAKE
-    run('synthetic2', 'lstm')
-    run('synthetic2', 'gru')
+    # run('synthetic2', 'rnn')  # todo: MINOR MISTAKE
+    # run('synthetic2', 'lstm')
+    # run('synthetic2', 'gru')
     # run('tomita1', 'rnn')
-    # run('tomita1', 'lstm')
-    # run('tomita1', 'gru', {"add_single_sample": True})
+    run('tomita1', 'lstm')
+    run('tomita1', 'gru')
     # run('tomita2', 'rnn')
     # run('tomita2', 'lstm')
     # run('tomita2', 'gru')

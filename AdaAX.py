@@ -45,7 +45,7 @@ def add_pattern(dfa: DFA, n, p, h):
                 return new_dfa, Q_new, None
         else:
             # add new states for missing transitions of a pattern
-            q1 = new_dfa.add_new_state(p[:i + 1], h[i], prev=q1)
+            q1 = new_dfa.add_new_state(p[:i + 1], h[i], n[i].pos_sup, prev=q1)
             new_dfa.mapping.update({q1: {n[i]}})
             # new_dfa.missing.remove(n[i])
             # new_dfa.missing.update(n[i].next)
@@ -174,6 +174,9 @@ def merge_states(dfa: DFA, state1, state2, inplace=False) -> Tuple[DFA, dict]:
     new_dfa = copy.copy(dfa) if not inplace else dfa
     mapping = {s: ns for s, ns in zip(dfa.Q, new_dfa.Q)}
     mapped_state1, mapped_state2 = mapping[state1], mapping[state2]
+    weight1, weight2 = mapped_state1.weight, mapped_state2.weight
+    mapped_state2.h = (weight1 * mapped_state1.h + weight2 * mapped_state2.h) / (weight1 + weight2)
+    mapped_state2.weight = weight1 + weight2
 
     # update accept mapping for absorb=True DFA
     if new_dfa.absorb:
@@ -272,7 +275,7 @@ def main(config):
     loader = RNNLoader(config.fname, config.model)
     pattern_sampler = PatternSampler(loader, absorb=config.absorb, pos_threshold=config.pos_threshold,
                                      sample_threshold=config.sample_threshold, return_sample=config.add_single_sample)
-    start_state = build_start_state()
+    start_state = build_start_state(loader)
     dfa = DFA(loader.alphabet, start_state, config.absorb)
 
     dfa = build_dfa(loader, dfa, pattern_sampler, config.neighbour, config.fidelity_loss, config.class_balanced)

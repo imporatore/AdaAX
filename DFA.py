@@ -88,15 +88,17 @@ class DFA:
 
         return True
 
-    def add_new_state(self, prefix, hidden, prev=None):
+    # todo: weight only positive support
+    def add_new_state(self, prefix, hidden, weight, prev=None):
         """ Add and return the new state from a new prefix.
 
         Args:
             prefix: list, a list of symbols which initialize the State (as a PureSet).
             hidden: float, hidden values of 'prefix'
+            weight: float, support (for absorbing DFA) or proportion (for non-absorbing DFA) of 'prefix'
             prev: None or State, parent state of the nre state
         """
-        state = State(hidden_values=hidden)  # Initialize pure set from new prefix
+        state = State(hidden_values=hidden, weight=weight)  # Initialize pure set from new prefix
         self.Q.append(state)  # Add to states
 
         if prev:
