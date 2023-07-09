@@ -2,7 +2,6 @@ from config import DFA_DIR, IMAGE_DIR, POS_THRESHOLD, SAMPLE_THRESHOLD, TAU, DEL
 from Helpers import ConfigDict
 from AdaAX import main
 
-
 DEFAULT_CONFIG = {"dfa_dir": DFA_DIR,
                   "image_dir": IMAGE_DIR,
                   "add_single_sample": False,
@@ -14,7 +13,10 @@ synthetic1_config = {"fname": "synthetic_data_1",
                      "neighbour": 1.,
                      "fidelity_loss": 0.,
                      "absorb": True,
-                     "class_balanced": False}
+                     "class_balanced": False,
+                     "merge_start": True,
+                     "merge_accept": True,
+                     "search": 'first'}
 
 synthetic2_config = {"fname": "synthetic_data_2",
                      "pos_threshold": .95,
@@ -22,15 +24,21 @@ synthetic2_config = {"fname": "synthetic_data_2",
                      "neighbour": 1.5,
                      "fidelity_loss": 0.,
                      "absorb": True,
-                     "class_balanced": False}
+                     "class_balanced": False,
+                     "merge_start": True,
+                     "merge_accept": True,
+                     "search": 'first'}
 
 tomita1_config = {"fname": "tomita_data_1",
                   "pos_threshold": .95,
                   "sample_threshold": 2,
-                  "neighbour": 3.,
+                  "neighbour": 0.5,
                   "fidelity_loss": 0.,
                   "absorb": False,
-                  "class_balanced": False}
+                  "class_balanced": False,
+                  "merge_start": True,
+                  "merge_accept": True,
+                  "search": 'first'}
 
 tomita2_config = {}
 
@@ -40,7 +48,10 @@ yelp_config = {"fname": "yelp_review_balanced",
                "neighbour": TAU,
                "fidelity_loss": DELTA,
                "absorb": False,
-               "class_balanced": False}
+               "class_balanced": False,
+               "merge_start": True,
+               "merge_accept": True,
+               "search": 'best'}
 
 
 def run(name, type, config=None):
@@ -82,8 +93,8 @@ if __name__ == "__main__":
     # run('synthetic2', 'lstm')
     # run('synthetic2', 'gru')
     # run('tomita1', 'rnn')
-    run('tomita1', 'lstm')
-    run('tomita1', 'gru')
+    # run('tomita1', 'lstm', {"neighbour": 5.})
+    run('tomita1', 'gru', {"neighbour": 5.})
     # run('tomita2', 'rnn')
     # run('tomita2', 'lstm')
     # run('tomita2', 'gru')

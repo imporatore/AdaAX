@@ -1,4 +1,7 @@
 from collections import defaultdict
+from typing import Dict
+
+import numpy as np
 
 
 class SymbolNode4Fidelity:
@@ -56,6 +59,7 @@ class PrefixTree4Fidelity:
             label: rnn_output, array of shape (N,)
         """
         self.root = SymbolNode4Fidelity('<start>')
+        self.root.h = np.zeros(hidden.shape[-1])  # initialize the root hidden values
         self._pos_weight, self._neg_weight = 1 / len(label), 1 / len(label)
         self._prop = 1 / len(label)
 
@@ -98,7 +102,7 @@ class PrefixTree4Fidelity:
             cur.neg_prop += self._prop
 
 
-def parse_tree_with_dfa(node, state, dfa):
+def parse_tree_with_dfa(node, state, dfa) -> Dict:
     """ Parse prefix tree with absorb DFA using DFS.
 
     Args:
@@ -108,7 +112,6 @@ def parse_tree_with_dfa(node, state, dfa):
 
     Return:
         state2nodes: dict[list], mapping from states (of the dfa) to list of nodes
-        missing: list, list of nodes to which the dfa has no forward transition
 
     Note:
         In absorb=True cases, we don't have to search deeper when an accept state is reached,
@@ -119,7 +122,6 @@ def parse_tree_with_dfa(node, state, dfa):
     assert dfa.absorb is True, "This parsing is for DFA which absorb=True."
 
     stack = [(node, state)]
-    # state2nodes, missing_nodes = defaultdict(set), set()
     state2nodes = defaultdict(set)
     while stack:
         node_, state_ = stack.pop()
@@ -129,14 +131,11 @@ def parse_tree_with_dfa(node, state, dfa):
                 if n.val in dfa.delta[state_].keys():  # transition already in dfa
                     s = dfa.delta[state_][n.val]
                     stack.append((n, s))
-                # else:  # either should be negative expression or positive expression misclassified (hasn't added)
-                #     missing_nodes.add(n)
 
-    # return state2nodes, missing_nodes
     return state2nodes
 
 
-def parse_tree_with_non_absorb_dfa(node, state, dfa):
+def parse_tree_with_non_absorb_dfa(node, state, dfa) -> Dict:
     """ Parse prefix tree with non-absorb DFA using DFS.
 
     Args:
@@ -146,7 +145,6 @@ def parse_tree_with_non_absorb_dfa(node, state, dfa):
 
     Return:
         state2nodes: dict[list], mapping from states (of the dfa) to list of nodes
-        missing: list, list of nodes to which the dfa has no forward transition
 
     Note:
         In absorb=False cases, we have to search deeper when an accept state is reached,
@@ -155,7 +153,6 @@ def parse_tree_with_non_absorb_dfa(node, state, dfa):
     assert dfa.absorb is False, "DFA which absorb=True should use parse_tree_with_dfa."
 
     stack = [(node, state)]
-    # state2nodes, missing_nodes = defaultdict(set), set()
     state2nodes = defaultdict(set)
     while stack:
         node_, state_ = stack.pop()
@@ -164,10 +161,7 @@ def parse_tree_with_non_absorb_dfa(node, state, dfa):
             if n.val in dfa.delta[state_].keys():  # transition already in dfa
                 s = dfa.delta[state_][n.val]
                 stack.append((n, s))
-            # else:  # either should be negative expression or positive expression misclassified (hasn't added)
-            #     missing_nodes.add(n)
 
-    # return state2nodes, missing_nodes
     return state2nodes
 
 

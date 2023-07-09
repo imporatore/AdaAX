@@ -75,13 +75,6 @@ class ConsistencyCheck:
         return _consistency_check
 
 
-# ---------------------------- math --------------------------------
-
-def d(hidden1: np.array, hidden2: np.array):
-    """ Euclidean distance of hidden state values."""
-    return np.sqrt(np.sum((hidden1 - hidden2) ** 2))
-
-
 # ------------------------- graphviz -------------------------------
 
 def add_nodes(graph, nodes):

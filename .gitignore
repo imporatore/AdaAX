@@ -24,3 +24,5 @@ __pycache__/*.pyc
 /data/dfa/*.pickle
 /data/image/*.png
 /data/image/*
+/data/temp/*.png
+/data/temp/*

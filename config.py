@@ -18,6 +18,7 @@ RNN_RESULT_DIR = os.path.join(DATA_DIR, 'rnn_result')
 
 DFA_DIR = os.path.join(DATA_DIR, 'dfa')
 IMAGE_DIR = os.path.join(DATA_DIR, 'image')
+TEMP_DIR = os.path.join(DATA_DIR, 'temp')
 
 # ------------------------------ RNN parameter ------------------------------------
 VOCAB_SIZE = 10000

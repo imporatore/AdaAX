@@ -2,11 +2,12 @@ import copy
 import warnings
 from collections import defaultdict, deque
 
+import numpy as np
 from pythomata import SimpleDFA  # help trimming, minimizing & plotting
 
 from States import State
 from Transition import TransitionTable
-from Fidelity import parse_tree_with_dfa, parse_tree_with_non_absorb_dfa
+from PrefixTree import parse_tree_with_dfa, parse_tree_with_non_absorb_dfa
 
 
 # todo: add state split to ensure gradually learning more & more difficult patterns from flow or samplers
@@ -35,18 +36,14 @@ class DFA:
             start_state: State, start state of the DFA
             absorb: bool, whether the accept states 'absorb' transitions
         """
+        self.absorb = absorb  # if accept state absorb transitions
         self.alphabet = alphabet  # alphabet
         self.q0 = start_state  # start state
         self.F = set()  # accept states
         self.Q = [self.q0]  # states
 
         self.delta = TransitionTable()  # transition table
-
-        self.absorb = absorb  # if accept state absorb transitions
-
         self.mapping = defaultdict(set)  # state2nodes mapping
-        # self.missing = set()  # current missing nodes
-
         self.fidelity = 0.
 
     def __copy__(self):
@@ -62,8 +59,6 @@ class DFA:
         if hasattr(self, 'mapping'):
             new_dfa.mapping = defaultdict(set, {map_dict[state]: {node for node in self.mapping[state]}
                                                 for state in self.mapping.keys()})
-        # if hasattr(self, 'missing'):
-        #     new_dfa.missing = {node for node in self.missing}
         if hasattr(self, 'fidelity'):
             new_dfa.fidelity = self.fidelity
         return new_dfa
@@ -88,17 +83,14 @@ class DFA:
 
         return True
 
-    # todo: weight only positive support
-    def add_new_state(self, prefix, hidden, weight, prev=None):
+    def add_new_state(self, prefix, prev=None):
         """ Add and return the new state from a new prefix.
 
         Args:
             prefix: list, a list of symbols which initialize the State (as a PureSet).
-            hidden: float, hidden values of 'prefix'
-            weight: float, support (for absorbing DFA) or proportion (for non-absorbing DFA) of 'prefix'
             prev: None or State, parent state of the nre state
         """
-        state = State(hidden_values=hidden, weight=weight)  # Initialize pure set from new prefix
+        state = State()  # Initialize pure set from new prefix
         self.Q.append(state)  # Add to states
 
         if prev:
@@ -204,20 +196,34 @@ class DFA:
         """
         assert state in self.Q, "State not recognized."
         if self.absorb:
-            # mapping, missing = parse_tree_with_dfa(node, state, self)
             mapping = parse_tree_with_dfa(node, state, self)
         else:
-            # mapping, missing = parse_tree_with_non_absorb_dfa(node, state, self)
             mapping = parse_tree_with_non_absorb_dfa(node, state, self)
-        # return mapping, missing
         return mapping
 
-    # def update_mapping(self, mapping, missing):
     def update_mapping(self, mapping):
         """ Update mapping and missing."""
         for state in mapping.keys():
             self.mapping[state].update(mapping[state])
-        # self.missing.update(missing)
+
+    # todo: explicit update when mapping changes
+    def eval_hidden_values(self, state):
+        assert state in self.Q, "State not found."
+        nodes = self.mapping[state]
+        # avg = np.average([node.h for node in nodes], axis=0)
+        # wavg = np.average([node.h for node in nodes], axis=0,
+        #                   weights=[node.pos_sup for node in nodes])
+        # if np.sqrt(np.sum((avg - wavg) ** 2)) > 0.1:
+        #     pass
+        return np.average([node.h for node in nodes], axis=0)
+        # return np.average([node.h for node in nodes], axis=0,
+        #                   weights=[node.pos_sup + node.neg_sup for node in nodes])
+
+    def eval_dist(self, state1: State, state2: State) -> float:
+        """ Euclidean distance of hidden values of state1 & state2."""
+        assert state1 in self.Q, "State 1 not found."
+        assert state2 in self.Q, "State 2 not found."
+        return np.sqrt(np.sum((self.eval_hidden_values(state1) - self.eval_hidden_values(state2)) ** 2))
 
     def remove_descendants(self, node, state):
         """ Remove all descendants of a node in dfa state2nodes mapping and missing.
@@ -238,9 +244,6 @@ class DFA:
                         if new_node in self.mapping[new_state]:
                             self.mapping[new_state].remove(new_node)
                             stack.append((new_node, new_state))
-                    # else:
-                    #     if n in self.missing:
-                    #         self.missing.remove(n)
 
     def _check_state_transition_mapping(self, other):
         """ Check if there exist a mapping from self to other that all transitions in self exist in other."""
@@ -317,25 +320,51 @@ class DFA:
         """ Check if the mapping is consistent with states and missing."""
         assert all([state in self.Q for state in self.mapping.keys()]), "State not recognized in state-node mapping."
 
+        to_delete_states = []
+
         # remove empty mapping
         for state in self.mapping.keys():
             if len(self.mapping[state]) == 0:
-                del self.mapping[state]
+                to_delete_states.append(state)
 
-        # for state in self.mapping.keys():
-        #     assert all([node not in self.missing for node in self.mapping[state]]), \
-        #         "Node in state-node mapping also found in missing."
+        for state in to_delete_states:
+            del self.mapping[state]
 
-    # todo: remove the usage of SimpleDFA and implement minimize, complete, trimming
+
+    def _is_complete(self):
+        """ Check if dfa is complete (have missing transitions). Only for non-absorb DFAs."""
+        if self.absorb or len(self.delta) == len(self.alphabet) * len(self.Q):
+            return True
+        return False
+
+    def complete(self):
+        """ Complete a dfa inplace. """
+        if not self._is_complete():
+            not_found_state = State()
+
+            for state in self.Q:
+                for s in self.alphabet:
+                    if s not in self.delta[state].keys():
+                        self.delta[state][s] = not_found_state
+
+            for s in self.alphabet:
+                self.delta[not_found_state][s] = not_found_state
+
+            self.Q.append(not_found_state)
+            return not_found_state
+        return None
+
+    # todo: remove the usage of SimpleDFA and implement minimize, trimming
     def to_simpledfa(self, minimize, trim):
         """ Convert into pythomata.SimpleDFA for plot."""
         alphabet = set(self.alphabet)
+        not_found_state = self.complete()
 
         if self.q0 in self.F:
             if len(self.F) == 1:
-                states_mapping, count = {self.q0: 'Start & Accept'}, 1
+                states_mapping, count = {self.q0: "Start \n Accept"}, 1
             else:
-                states_mapping, count, accept_count = {self.q0: 'Start & Accept1'}, 1, 2
+                states_mapping, count, accept_count = {self.q0: "Start \n Accept1"}, 1, 2
 
                 for state in self.F:
                     if state != self.q0:
@@ -350,9 +379,11 @@ class DFA:
                 states_mapping.update({state: 'Accept' + str(i + 1) for i, state in enumerate(self.F)})
 
         for state in self.Q:
-            if state not in self.F.union({self.q0}):
+            if state not in self.F.union({self.q0, not_found_state}):
                 states_mapping.update({state: 'State' + str(count)})
                 count += 1
+            elif state == not_found_state:
+                states_mapping.update({state: 'Null'})
 
         states = set([states_mapping[state] for state in self.Q])
         initial_state = states_mapping[self.q0]

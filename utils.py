@@ -4,7 +4,7 @@ import functools
 
 import numpy as np
 
-from Fidelity import PrefixTree4Fidelity
+from PrefixTree import PrefixTree4Fidelity
 from config import RNN_RESULT_DIR, VOCAB_DIR
 from data.utils import load_npy, load_pickle
 
